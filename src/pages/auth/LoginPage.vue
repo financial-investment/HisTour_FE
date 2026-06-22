@@ -281,7 +281,7 @@ label,
 }
 
 .input-wrap input::placeholder {
-  color: #18263a;
+  color: #9aa3af;
   opacity: 1;
 }
 
