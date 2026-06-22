@@ -8,12 +8,7 @@ const { toasts } = useToast()
   <Teleport to="body">
     <div class="toast-container">
       <TransitionGroup name="toast">
-        <div
-          v-for="toast in toasts"
-          :key="toast.id"
-          class="toast"
-          :class="toast.type"
-        >
+        <div v-for="toast in toasts" :key="toast.id" class="toast" :class="toast.type">
           {{ toast.message }}
         </div>
       </TransitionGroup>
@@ -45,9 +40,15 @@ const { toasts } = useToast()
   box-shadow: var(--shadow-md);
 }
 
-.toast.success { background: #2d7a4f; }
-.toast.error   { background: var(--color-error); }
-.toast.info    { background: var(--color-primary-container); }
+.toast.success {
+  background: #2d7a4f;
+}
+.toast.error {
+  background: var(--color-error);
+}
+.toast.info {
+  background: var(--color-primary-container);
+}
 
 .toast-enter-active,
 .toast-leave-active {

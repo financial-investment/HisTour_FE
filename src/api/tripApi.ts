@@ -12,9 +12,7 @@ export const tripApi = {
   },
 
   create(payload: { title?: string; tripDate?: string }) {
-    return apiClient
-      .post<ApiResponse<TripResponse>>('/api/trip', payload)
-      .then((r) => r.data.data)
+    return apiClient.post<ApiResponse<TripResponse>>('/api/trip', payload).then((r) => r.data.data)
   },
 
   getDetail(tripId: number) {
