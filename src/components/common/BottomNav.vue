@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -15,7 +14,6 @@ function isActive(path: string) {
   return route.path.startsWith(path)
 }
 
-const activeTrip = computed(() => route.path.startsWith('/trip'))
 </script>
 
 <template>

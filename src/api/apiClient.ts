@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse, TokenResponse } from '@/types/api'
 
 const ACCESS_TOKEN_KEY = 'histour_access_token'
@@ -17,74 +17,66 @@ export const tokenStorage = {
   },
 }
 
+interface RetryConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean
+}
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 })
 
-// 요청마다 access token 주입
 apiClient.interceptors.request.use((config) => {
   const token = tokenStorage.getAccess()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-let isRefreshing = false
-let waitQueue: Array<(token: string) => void> = []
+let refreshPromise: Promise<TokenResponse> | null = null
 
-function drainQueue(newToken: string) {
-  waitQueue.forEach((resolve) => resolve(newToken))
-  waitQueue = []
+function refreshTokens(refreshToken: string) {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post<ApiResponse<TokenResponse>>(
+        `${import.meta.env.VITE_API_BASE_URL || ''}/api/auth/refresh`,
+        { refreshToken },
+      )
+      .then(({ data }) => {
+        tokenStorage.set(data.data.accessToken, data.data.refreshToken)
+        return data.data
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
 }
 
-// 401 → refresh → retry
 apiClient.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const original = error.config
-
-    if (error.response?.status !== 401 || original._retry) {
+  (response) => response,
+  async (error: AxiosError) => {
+    const original = error.config as RetryConfig | undefined
+    if (error.response?.status !== 401 || !original || original._retry) {
       return Promise.reject(error)
     }
 
     const refreshToken = tokenStorage.getRefresh()
     if (!refreshToken) {
       tokenStorage.clear()
-      window.location.href = '/login'
+      window.location.assign('/login')
       return Promise.reject(error)
-    }
-
-    if (isRefreshing) {
-      return new Promise((resolve) => {
-        waitQueue.push((token) => {
-          original.headers.Authorization = `Bearer ${token}`
-          resolve(apiClient(original))
-        })
-      })
     }
 
     original._retry = true
-    isRefreshing = true
-
     try {
-      const { data } = await axios.post<ApiResponse<TokenResponse>>(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/auth/refresh`,
-        { refreshToken },
-      )
-      const { accessToken, refreshToken: newRefresh } = data.data
-      tokenStorage.set(accessToken, newRefresh)
-      drainQueue(accessToken)
-      original.headers.Authorization = `Bearer ${accessToken}`
+      const tokens = await refreshTokens(refreshToken)
+      original.headers.Authorization = `Bearer ${tokens.accessToken}`
       return apiClient(original)
-    } catch {
+    } catch (refreshError) {
       tokenStorage.clear()
-      window.location.href = '/login'
-      return Promise.reject(error)
-    } finally {
-      isRefreshing = false
+      window.location.assign('/login')
+      return Promise.reject(refreshError)
     }
   },
 )

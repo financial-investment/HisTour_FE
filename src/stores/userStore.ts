@@ -1,54 +1,66 @@
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { login as requestLogin, logout as requestLogout } from '@/api/auth'
 import { tokenStorage } from '@/api/apiClient'
-import apiClient from '@/api/apiClient'
-import type { ApiResponse, UserResponse, TokenResponse } from '@/types/api'
+import { getMyProfile } from '@/api/user'
+import type { UserResponse } from '@/types/api'
 
 export const useUserStore = defineStore('user', () => {
   const user = ref<UserResponse | null>(null)
+  const accessToken = ref(tokenStorage.getAccess())
   const isInitialized = ref(false)
-
-  const isLoggedIn = computed(() => !!user.value)
+  const isAuthenticated = computed(() => Boolean(accessToken.value))
+  const isLoggedIn = isAuthenticated
 
   async function login(email: string, password: string) {
-    const { data } = await apiClient.post<ApiResponse<TokenResponse>>('/api/auth/login', {
-      email,
-      password,
-    })
-    tokenStorage.set(data.data.accessToken, data.data.refreshToken)
-    await fetchMe()
+    const tokens = await requestLogin(email, password)
+    tokenStorage.set(tokens.accessToken, tokens.refreshToken)
+    accessToken.value = tokens.accessToken
+    await loadProfile()
   }
 
-  async function fetchMe() {
-    try {
-      const { data } = await apiClient.get<ApiResponse<UserResponse>>('/api/user/me')
-      user.value = data.data
-    } catch {
-      user.value = null
-    }
+  async function loadProfile() {
+    user.value = await getMyProfile()
+    return user.value
   }
 
   async function logout() {
     try {
-      const refreshToken = tokenStorage.getRefresh()
-      if (refreshToken) {
-        await apiClient.post('/api/auth/logout', { refreshToken })
-      }
-    } catch {
-      // 서버 오류여도 로컬은 클리어
+      await requestLogout()
     } finally {
-      tokenStorage.clear()
-      user.value = null
+      clearSession()
     }
+  }
+
+  function clearSession() {
+    tokenStorage.clear()
+    accessToken.value = null
+    user.value = null
   }
 
   async function init() {
     if (isInitialized.value) return
     isInitialized.value = true
-    if (tokenStorage.getAccess()) {
-      await fetchMe()
+    if (!accessToken.value) return
+
+    try {
+      await loadProfile()
+      accessToken.value = tokenStorage.getAccess()
+    } catch {
+      clearSession()
     }
   }
 
-  return { user, isLoggedIn, isInitialized, login, logout, fetchMe, init }
+  return {
+    user,
+    accessToken,
+    isAuthenticated,
+    isLoggedIn,
+    isInitialized,
+    login,
+    loadProfile,
+    logout,
+    clearSession,
+    init,
+  }
 })

@@ -10,9 +10,9 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
-app.use(router)
 
 const userStore = useUserStore()
 userStore.init().finally(() => {
+  app.use(router)
   app.mount('#app')
 })

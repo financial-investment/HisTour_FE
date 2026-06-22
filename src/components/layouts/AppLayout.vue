@@ -5,7 +5,7 @@ import BottomNav from '@/components/common/BottomNav.vue'
 <template>
   <div class="app-layout">
     <main class="app-content">
-      <slot />
+      <RouterView />
     </main>
     <BottomNav />
   </div>
