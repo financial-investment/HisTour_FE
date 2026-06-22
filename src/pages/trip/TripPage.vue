@@ -44,6 +44,11 @@ function formatTime(value: string) {
   }).format(new Date(value))
 }
 
+function formatDistance(distanceM: number) {
+  if (distanceM < 1000) return `${Math.round(distanceM)}m`
+  return `${(distanceM / 1000).toFixed(1)}km`
+}
+
 async function loadTrips() {
   isLoading.value = true
   errorMessage.value = ''
@@ -105,6 +110,21 @@ async function loadRecommendations() {
   } finally {
     isLoadingRecommendations.value = false
   }
+}
+
+function moveToCurrentLocation() {
+  if (!map || !coordinates.value) return
+  map.flyTo([coordinates.value.lat, coordinates.value.lng], Math.max(map.getZoom(), 15), {
+    duration: 0.7,
+  })
+}
+
+async function refreshNearbyHeritages() {
+  if (isLoadingRecommendations.value) return
+  errorMessage.value = ''
+  coordinates.value = await getCurrentCoordinates()
+  await loadRecommendations()
+  renderMap()
 }
 
 function renderMap() {
@@ -252,7 +272,33 @@ onBeforeUnmount(() => map?.remove())
         <span v-else-if="recommendations.length">가까운 문화유산 {{ recommendations.length }}곳을 찾았어요.</span>
         <span v-else>{{ coordinates?.isFallback ? '위치 권한을 허용하면 현재 위치로 이동해요.' : '주변에 추천할 문화유산이 없어요.' }}</span>
       </div>
-      <RouterLink class="scan-button" :to="`/trip/${activeTrip?.tripId}/scan`" aria-label="문화재 스캔">
+
+      <div class="map-actions" aria-label="지도 조작">
+        <button type="button" aria-label="현재 위치로 이동" title="현재 위치로 이동" @click="moveToCurrentLocation">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1"/></svg>
+        </button>
+        <button type="button" :disabled="isLoadingRecommendations" aria-label="주변 문화유산 새로고침" title="주변 문화유산 새로고침" @click="refreshNearbyHeritages">
+          <svg :class="{ spinning: isLoadingRecommendations }" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6.1 6.1L4 8M5.5 15A7 7 0 0 0 17.9 17.9L20 16"/></svg>
+        </button>
+      </div>
+
+      <article v-if="selectedHeritage" class="heritage-preview" aria-live="polite">
+        <img v-if="selectedHeritage.thumbnailUrl" :src="selectedHeritage.thumbnailUrl" :alt="selectedHeritage.name" />
+        <div v-else class="preview-placeholder" aria-hidden="true">🏛</div>
+        <div class="preview-content">
+          <span>NEARBY HERITAGE · {{ formatDistance(selectedHeritage.distanceM) }}</span>
+          <strong>{{ selectedHeritage.name }}</strong>
+          <div class="preview-links">
+            <RouterLink :to="`/heritage/${selectedHeritage.heritageId}`">상세 보기</RouterLink>
+            <RouterLink class="scan-link" :to="`/trip/${activeTrip?.tripId}/scan`">
+              <svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M8 12h8"/></svg>
+              스캔하기
+            </RouterLink>
+          </div>
+        </div>
+      </article>
+
+      <RouterLink v-else class="scan-button" :to="`/trip/${activeTrip?.tripId}/scan`" aria-label="문화재 스캔">
         <svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M8 12h8"/></svg>
         <span>문화재 스캔</span>
       </RouterLink>
@@ -339,6 +385,21 @@ label > span { display: block; margin-bottom: 9px; color: #263a56; font-size: 11
 .map { width: 100%; height: 100%; background: #e8e0cf; }
 .map-caption { position: absolute; z-index: 500; top: 16px; left: 16px; padding: 10px 13px; border: 1px solid rgba(255,255,255,.8); border-radius: 8px; display: flex; flex-direction: column; background: rgba(255,255,255,.9); box-shadow: 0 5px 18px rgba(18,39,68,.15); backdrop-filter: blur(8px); }
 .map-caption strong { font-size: 11px; }.map-caption span { margin-top: 2px; color: #6f7a87; font-size: 9px; }
+.map-actions { position: absolute; z-index: 500; top: 16px; right: 16px; display: grid; gap: 8px; }
+.map-actions button { width: 42px; height: 42px; border: 1px solid rgba(255,255,255,.85); border-radius: 50%; display: grid; place-items: center; color: #17345c; background: rgba(255,255,255,.94); box-shadow: 0 5px 18px rgba(18,39,68,.18); backdrop-filter: blur(8px); }
+.map-actions button:disabled { opacity: .6; cursor: wait; }
+.map-actions svg { width: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.map-actions svg.spinning { animation: spin .8s linear infinite; }
+.heritage-preview { position: absolute; z-index: 500; right: 14px; bottom: 16px; left: 14px; min-height: 112px; padding: 10px; border: 1px solid rgba(255,255,255,.9); border-radius: 14px; display: flex; gap: 12px; background: rgba(255,255,255,.96); box-shadow: 0 10px 28px rgba(18,39,68,.22); backdrop-filter: blur(12px); }
+.heritage-preview > img, .preview-placeholder { width: 92px; min-height: 92px; border-radius: 9px; flex: 0 0 auto; object-fit: cover; }
+.preview-placeholder { display: grid; place-items: center; color: #9b6a36; background: linear-gradient(145deg,#eee2ca,#d9cab0); font-size: 29px; }
+.preview-content { min-width: 0; padding: 3px 1px 1px; display: flex; flex: 1; flex-direction: column; }
+.preview-content > span { overflow: hidden; color: #c46c18; font-size: 8px; font-weight: 700; letter-spacing: .08em; text-overflow: ellipsis; white-space: nowrap; }
+.preview-content > strong { margin-top: 3px; overflow: hidden; font-family: var(--font-serif); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.preview-links { margin-top: auto; display: flex; align-items: center; gap: 7px; }
+.preview-links a { min-height: 32px; padding: 0 11px; border: 1px solid #cbd3df; border-radius: 17px; display: inline-flex; align-items: center; justify-content: center; color: #34465f; font-size: 10px; font-weight: 700; }
+.preview-links .scan-link { border-color: #142b4c; gap: 5px; color: white; background: #142b4c; }
+.preview-links svg { width: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .scan-button { position: absolute; z-index: 500; right: 18px; bottom: 18px; padding: 13px 17px; border-radius: 28px; display: flex; align-items: center; gap: 8px; color: white; background: #142b4c; box-shadow: 0 8px 22px rgba(20,43,76,.3); font-size: 11px; font-weight: 700; }
 .scan-button svg { width: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .visited-section { padding: 22px 18px 30px; background: #f8f9ff; }
