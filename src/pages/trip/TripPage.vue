@@ -8,7 +8,7 @@ import type { RecommendedHeritage, TripDetailResponse, TripResponse } from '@/ty
 import { loadKakaoMaps, type KakaoMap, type KakaoMapsApi } from '@/utils/kakaoMaps'
 
 const router = useRouter()
-const { heading, isActive: isHeadingActive, requestHeadingPermission, stopHeading } = useDeviceHeading()
+const { heading, requestHeadingPermission, stopHeading } = useDeviceHeading()
 const trips = ref<TripResponse[]>([])
 const activeTrip = ref<TripDetailResponse | null>(null)
 const recommendations = ref<RecommendedHeritage[]>([])
@@ -24,7 +24,6 @@ const isLoadingRecommendations = ref(false)
 const showCompleteDialog = ref(false)
 const errorMessage = ref('')
 const mapErrorMessage = ref('')
-const headingMessage = ref('')
 let map: KakaoMap | null = null
 let kakaoMaps: KakaoMapsApi | null = null
 let mapObjects: Array<{ setMap(map: KakaoMap | null): void }> = []
@@ -122,21 +121,16 @@ async function loadRecommendations() {
   }
 }
 
-function moveToCurrentLocation() {
+async function moveToCurrentLocation() {
   if (!map || !coordinates.value || !kakaoMaps) return
+  try {
+    await requestHeadingPermission()
+  } catch {
+    // 방향 센서 권한이 없어도 현재 위치 이동은 계속 제공합니다.
+  }
   const currentPosition = new kakaoMaps.LatLng(coordinates.value.lat, coordinates.value.lng)
   map.panTo(currentPosition)
   if (map.getLevel() > 4) map.setLevel(4, { anchor: currentPosition, animate: true })
-}
-
-async function enableDeviceHeading() {
-  headingMessage.value = ''
-  try {
-    await requestHeadingPermission()
-    moveToCurrentLocation()
-  } catch (error) {
-    headingMessage.value = error instanceof Error ? error.message : '방향 센서를 사용할 수 없어요.'
-  }
 }
 
 async function refreshNearbyHeritages() {
@@ -344,20 +338,7 @@ onBeforeUnmount(() => {
         <button type="button" :disabled="isLoadingRecommendations" aria-label="주변 문화유산 새로고침" title="주변 문화유산 새로고침" @click="refreshNearbyHeritages">
           <svg :class="{ spinning: isLoadingRecommendations }" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6.1 6.1L4 8M5.5 15A7 7 0 0 0 17.9 17.9L20 16"/></svg>
         </button>
-        <button
-          type="button"
-          class="heading-button"
-          :class="{ active: isHeadingActive }"
-          :aria-pressed="isHeadingActive"
-          aria-label="휴대폰 방향 표시"
-          title="휴대폰 방향 표시"
-          @click="enableDeviceHeading"
-        >
-          <svg :style="{ transform: `rotate(${heading ?? 0}deg)` }" viewBox="0 0 24 24"><path d="m12 3 5 16-5-3-5 3 5-16Z"/></svg>
-        </button>
       </div>
-
-      <p v-if="headingMessage" class="heading-message" role="alert">{{ headingMessage }}</p>
 
       <article v-if="selectedHeritage" class="heritage-preview" aria-live="polite">
         <img v-if="selectedHeritage.thumbnailUrl" :src="selectedHeritage.thumbnailUrl" :alt="selectedHeritage.name" />
@@ -469,9 +450,6 @@ label > span { display: block; margin-bottom: 9px; color: #263a56; font-size: 11
 .map-actions button:disabled { opacity: .6; cursor: wait; }
 .map-actions svg { width: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .map-actions svg.spinning { animation: spin .8s linear infinite; }
-.map-actions .heading-button.active { color: white; background: #2877c7; }
-.map-actions .heading-button svg { transition: transform .12s linear; }
-.heading-message { position: absolute; z-index: 550; top: 164px; right: 16px; max-width: 220px; padding: 8px 11px; border-radius: 7px; color: white; background: rgba(124,36,36,.88); font-size: 9px; line-height: 1.4; }
 .heritage-preview { position: absolute; z-index: 500; right: 14px; bottom: 16px; left: 14px; min-height: 112px; padding: 10px; border: 1px solid rgba(255,255,255,.9); border-radius: 14px; display: flex; gap: 12px; background: rgba(255,255,255,.96); box-shadow: 0 10px 28px rgba(18,39,68,.22); backdrop-filter: blur(12px); }
 .heritage-preview > img, .preview-placeholder { width: 92px; min-height: 92px; border-radius: 9px; flex: 0 0 auto; object-fit: cover; }
 .preview-placeholder { display: grid; place-items: center; color: #9b6a36; background: linear-gradient(145deg,#eee2ca,#d9cab0); font-size: 29px; }
