@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { tripApi } from '@/api/tripApi'
 import { getCurrentCoordinates, type Coordinates } from '@/composables/useGeolocation'
+import { useDeviceHeading } from '@/composables/useDeviceHeading'
 import type { RecommendedHeritage, TripDetailResponse, TripResponse } from '@/types/api'
 import { loadKakaoMaps, type KakaoMap, type KakaoMapsApi } from '@/utils/kakaoMaps'
 
 const router = useRouter()
+const { heading, isActive: isHeadingActive, requestHeadingPermission, stopHeading } = useDeviceHeading()
 const trips = ref<TripResponse[]>([])
 const activeTrip = ref<TripDetailResponse | null>(null)
 const recommendations = ref<RecommendedHeritage[]>([])
@@ -22,9 +24,11 @@ const isLoadingRecommendations = ref(false)
 const showCompleteDialog = ref(false)
 const errorMessage = ref('')
 const mapErrorMessage = ref('')
+const headingMessage = ref('')
 let map: KakaoMap | null = null
 let kakaoMaps: KakaoMapsApi | null = null
 let mapObjects: Array<{ setMap(map: KakaoMap | null): void }> = []
+let currentMarkerElement: HTMLElement | null = null
 
 const hasActiveTrip = computed(() => Boolean(activeTrip.value))
 const visitedLogs = computed(() => activeTrip.value?.visitLogs ?? [])
@@ -121,6 +125,16 @@ function moveToCurrentLocation() {
   if (map.getLevel() > 4) map.setLevel(4, { anchor: currentPosition, animate: true })
 }
 
+async function enableDeviceHeading() {
+  headingMessage.value = ''
+  try {
+    await requestHeadingPermission()
+    moveToCurrentLocation()
+  } catch (error) {
+    headingMessage.value = error instanceof Error ? error.message : '방향 센서를 사용할 수 없어요.'
+  }
+}
+
 async function refreshNearbyHeritages() {
   if (isLoadingRecommendations.value) return
   errorMessage.value = ''
@@ -142,13 +156,15 @@ async function renderMap() {
     const center = new kakaoMaps.LatLng(coordinates.value.lat, coordinates.value.lng)
     map = new kakaoMaps.Map(mapElement.value, { center, level: 4 })
 
-    const currentMarker = document.createElement('div')
-    currentMarker.className = 'current-location-marker'
-    currentMarker.title = '현재 위치'
-    currentMarker.innerHTML = '<span></span>'
+    currentMarkerElement = document.createElement('div')
+    currentMarkerElement.className = 'current-location-marker'
+    currentMarkerElement.title = '현재 위치'
+    currentMarkerElement.style.setProperty('--device-heading', `${heading.value ?? 0}deg`)
+    currentMarkerElement.classList.toggle('has-heading', heading.value !== null)
+    currentMarkerElement.innerHTML = '<i aria-hidden="true"></i><span></span>'
     const currentOverlay = new kakaoMaps.CustomOverlay({
       position: center,
-      content: currentMarker,
+      content: currentMarkerElement,
       xAnchor: 0.5,
       yAnchor: 0.5,
       zIndex: 3,
@@ -231,9 +247,15 @@ async function completeTrip() {
 }
 
 onMounted(loadTrips)
+watch(heading, (value) => {
+  currentMarkerElement?.classList.toggle('has-heading', value !== null)
+  if (value !== null) currentMarkerElement?.style.setProperty('--device-heading', `${value}deg`)
+})
 onBeforeUnmount(() => {
+  stopHeading()
   mapObjects.forEach((object) => object.setMap(null))
   mapObjects = []
+  currentMarkerElement = null
   map = null
 })
 </script>
@@ -318,7 +340,20 @@ onBeforeUnmount(() => {
         <button type="button" :disabled="isLoadingRecommendations" aria-label="주변 문화유산 새로고침" title="주변 문화유산 새로고침" @click="refreshNearbyHeritages">
           <svg :class="{ spinning: isLoadingRecommendations }" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6.1 6.1L4 8M5.5 15A7 7 0 0 0 17.9 17.9L20 16"/></svg>
         </button>
+        <button
+          type="button"
+          class="heading-button"
+          :class="{ active: isHeadingActive }"
+          :aria-pressed="isHeadingActive"
+          aria-label="휴대폰 방향 표시"
+          title="휴대폰 방향 표시"
+          @click="enableDeviceHeading"
+        >
+          <svg :style="{ transform: `rotate(${heading ?? 0}deg)` }" viewBox="0 0 24 24"><path d="m12 3 5 16-5-3-5 3 5-16Z"/></svg>
+        </button>
       </div>
+
+      <p v-if="headingMessage" class="heading-message" role="alert">{{ headingMessage }}</p>
 
       <article v-if="selectedHeritage" class="heritage-preview" aria-live="polite">
         <img v-if="selectedHeritage.thumbnailUrl" :src="selectedHeritage.thumbnailUrl" :alt="selectedHeritage.name" />
@@ -430,6 +465,9 @@ label > span { display: block; margin-bottom: 9px; color: #263a56; font-size: 11
 .map-actions button:disabled { opacity: .6; cursor: wait; }
 .map-actions svg { width: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .map-actions svg.spinning { animation: spin .8s linear infinite; }
+.map-actions .heading-button.active { color: white; background: #2877c7; }
+.map-actions .heading-button svg { transition: transform .12s linear; }
+.heading-message { position: absolute; z-index: 550; top: 164px; right: 16px; max-width: 220px; padding: 8px 11px; border-radius: 7px; color: white; background: rgba(124,36,36,.88); font-size: 9px; line-height: 1.4; }
 .heritage-preview { position: absolute; z-index: 500; right: 14px; bottom: 16px; left: 14px; min-height: 112px; padding: 10px; border: 1px solid rgba(255,255,255,.9); border-radius: 14px; display: flex; gap: 12px; background: rgba(255,255,255,.96); box-shadow: 0 10px 28px rgba(18,39,68,.22); backdrop-filter: blur(12px); }
 .heritage-preview > img, .preview-placeholder { width: 92px; min-height: 92px; border-radius: 9px; flex: 0 0 auto; object-fit: cover; }
 .preview-placeholder { display: grid; place-items: center; color: #9b6a36; background: linear-gradient(145deg,#eee2ca,#d9cab0); font-size: 29px; }
@@ -452,7 +490,11 @@ label > span { display: block; margin-bottom: 9px; color: #263a56; font-size: 11
 .dialog-backdrop { position: fixed; z-index: 10000; inset: 0; padding: 20px; display: grid; place-items: center; background: rgba(3,22,50,.68); backdrop-filter: blur(5px); }
 .complete-dialog { width: min(100%, 360px); padding: 30px 25px 22px; text-align: center; color: #14233a; background: #fff; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
 .dialog-emblem { width: 54px; height: 54px; margin: auto; border-radius: 50%; display: grid; place-items: center; color: white; background: #1c7750; font-size: 24px; }.complete-dialog > p { margin-top: 16px; color: #c46c18; font-size: 9px; font-weight: 700; letter-spacing: .15em; }.complete-dialog h2 { margin-top: 5px; font-family: var(--font-serif); font-size: 24px; }.complete-dialog > span { display: block; margin-top: 9px; color: #6f7987; font-size: 12px; line-height: 1.6; }.complete-dialog dl { margin-top: 22px; border-block: 1px solid #e0e5ec; }.complete-dialog dl div { padding: 12px 2px; display: flex; justify-content: space-between; }.complete-dialog dl div + div { border-top: 1px solid #edf0f4; }.complete-dialog dt { color: #7a8491; font-size: 11px; }.complete-dialog dd { font-size: 12px; font-weight: 700; }.complete-dialog .primary-button { margin-top: 22px; }.text-button { margin-top: 14px; color: #687485; font-size: 11px; }
-:global(.current-location-marker span) { display: block; width: 20px; height: 20px; border: 5px solid white; border-radius: 50%; background: #2877c7; box-shadow: 0 0 0 2px #2877c7, 0 3px 10px rgba(0,0,0,.25); }
+:global(.current-location-marker) { position: relative; width: 50px; height: 50px; display: grid; place-items: center; pointer-events: none; }
+:global(.current-location-marker i) { position: absolute; inset: 0; opacity: 0; transform: rotate(var(--device-heading,0deg)); transition: opacity .2s ease,transform .12s linear; }
+:global(.current-location-marker.has-heading i) { opacity: 1; }
+:global(.current-location-marker i::before) { position: absolute; top: -3px; left: 50%; width: 0; height: 0; border-right: 8px solid transparent; border-bottom: 23px solid rgba(40,119,199,.82); border-left: 8px solid transparent; transform: translateX(-50%); filter: drop-shadow(0 2px 2px rgba(0,0,0,.2)); content: ""; }
+:global(.current-location-marker span) { position: relative; z-index: 1; display: block; width: 20px; height: 20px; border: 5px solid white; border-radius: 50%; background: #2877c7; box-shadow: 0 0 0 2px #2877c7, 0 3px 10px rgba(0,0,0,.25); }
 :global(.heritage-map-marker span) { width: 32px; height: 32px; border: 3px solid white; border-radius: 50% 50% 50% 4px; display: grid; place-items: center; transform: rotate(-45deg); color: white; background: #17345c; box-shadow: 0 4px 10px rgba(0,0,0,.3); font-size: 11px; font-weight: 700; }
 :global(.heritage-map-marker span::first-letter) { transform: rotate(45deg); }
 :global(.recommended-map-marker span) { width: 34px; height: 34px; border: 3px solid white; border-radius: 50% 50% 50% 4px; display: grid; place-items: center; transform: rotate(-45deg); color: white; background: #d97706; box-shadow: 0 4px 12px rgba(69,34,0,.35); font-size: 10px; }
