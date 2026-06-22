@@ -37,7 +37,7 @@ export interface ExplainResponse {
 }
 
 export interface TripResponse {
-  id: number
+  tripId: number
   title: string | null
   tripDate: string | null
   status: 'IN_PROGRESS' | 'COMPLETED'
@@ -55,7 +55,7 @@ export interface VisitLogResponse {
 }
 
 export interface TripDetailResponse {
-  id: number
+  tripId: number
   title: string | null
   tripDate: string | null
   status: 'IN_PROGRESS' | 'COMPLETED'
