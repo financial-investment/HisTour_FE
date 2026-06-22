@@ -5,11 +5,13 @@ import L, { type Map as LeafletMap } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { tripApi } from '@/api/tripApi'
 import { getCurrentCoordinates, type Coordinates } from '@/composables/useGeolocation'
-import type { TripDetailResponse, TripResponse } from '@/types/api'
+import type { RecommendedHeritage, TripDetailResponse, TripResponse } from '@/types/api'
 
 const router = useRouter()
 const trips = ref<TripResponse[]>([])
 const activeTrip = ref<TripDetailResponse | null>(null)
+const recommendations = ref<RecommendedHeritage[]>([])
+const selectedHeritage = ref<RecommendedHeritage | null>(null)
 const coordinates = ref<Coordinates | null>(null)
 const mapElement = ref<HTMLElement | null>(null)
 const title = ref('')
@@ -17,6 +19,7 @@ const tripDate = ref(new Date().toISOString().slice(0, 10))
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isCompleting = ref(false)
+const isLoadingRecommendations = ref(false)
 const showCompleteDialog = ref(false)
 const errorMessage = ref('')
 let map: LeafletMap | null = null
@@ -50,6 +53,7 @@ async function loadTrips() {
     if (current) {
       activeTrip.value = await tripApi.getDetail(current.tripId)
       coordinates.value = await getCurrentCoordinates()
+      await loadRecommendations()
       await nextTick()
       renderMap()
     }
@@ -71,12 +75,35 @@ async function createTrip() {
     })
     activeTrip.value = await tripApi.getDetail(tripId)
     coordinates.value = await getCurrentCoordinates()
+    await loadRecommendations()
     await nextTick()
     renderMap()
   } catch {
     errorMessage.value = '여행을 시작하지 못했어요. 입력 내용을 확인해 주세요.'
   } finally {
     isSubmitting.value = false
+  }
+}
+
+async function loadRecommendations() {
+  if (!activeTrip.value || !coordinates.value) return
+
+  isLoadingRecommendations.value = true
+  try {
+    const result = await tripApi.recommendNext(
+      activeTrip.value.tripId,
+      coordinates.value.lat,
+      coordinates.value.lng,
+    )
+    const visitedHeritageIds = new Set(visitedLogs.value.map((log) => log.heritageId))
+    recommendations.value = result.filter((heritage) => !visitedHeritageIds.has(heritage.heritageId))
+    selectedHeritage.value = recommendations.value[0] ?? null
+  } catch {
+    recommendations.value = []
+    selectedHeritage.value = null
+    errorMessage.value = '주변 문화유산을 불러오지 못했어요.'
+  } finally {
+    isLoadingRecommendations.value = false
   }
 }
 
@@ -116,6 +143,25 @@ function renderMap() {
   if (routePoints.length > 1) {
     L.polyline(routePoints, { color: '#1a365d', weight: 4, opacity: 0.8 }).addTo(map)
   }
+
+  recommendations.value.forEach((heritage) => {
+    const icon = L.divIcon({
+      className: 'recommended-map-marker',
+      html: '<span aria-hidden="true">◆</span>',
+      iconSize: [38, 46],
+      iconAnchor: [19, 42],
+    })
+    L.marker([heritage.lat, heritage.lng], {
+      icon,
+      title: heritage.name,
+      keyboard: true,
+    })
+      .addTo(map!)
+      .bindTooltip(heritage.name, { direction: 'top', offset: [0, -32] })
+      .on('click', () => {
+        selectedHeritage.value = heritage
+      })
+  })
 }
 
 async function completeTrip() {
@@ -202,7 +248,9 @@ onBeforeUnmount(() => map?.remove())
       <div ref="mapElement" class="map" aria-label="현재 여행 지도" />
       <div class="map-caption">
         <strong>{{ coordinates?.isFallback ? '서울 중심 지도' : '현재 위치 연결됨' }}</strong>
-        <span>{{ coordinates?.isFallback ? '위치 권한을 허용하면 현재 위치로 이동해요.' : '주변 역사 기록을 탐색하고 있어요.' }}</span>
+        <span v-if="isLoadingRecommendations">주변 문화유산을 찾고 있어요.</span>
+        <span v-else-if="recommendations.length">가까운 문화유산 {{ recommendations.length }}곳을 찾았어요.</span>
+        <span v-else>{{ coordinates?.isFallback ? '위치 권한을 허용하면 현재 위치로 이동해요.' : '주변에 추천할 문화유산이 없어요.' }}</span>
       </div>
       <RouterLink class="scan-button" :to="`/trip/${activeTrip?.tripId}/scan`" aria-label="문화재 스캔">
         <svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M8 12h8"/></svg>
@@ -306,5 +354,7 @@ label > span { display: block; margin-bottom: 9px; color: #263a56; font-size: 11
 :global(.current-location-marker span) { display: block; width: 20px; height: 20px; border: 5px solid white; border-radius: 50%; background: #2877c7; box-shadow: 0 0 0 2px #2877c7, 0 3px 10px rgba(0,0,0,.25); }
 :global(.heritage-map-marker span) { width: 32px; height: 32px; border: 3px solid white; border-radius: 50% 50% 50% 4px; display: grid; place-items: center; transform: rotate(-45deg); color: white; background: #17345c; box-shadow: 0 4px 10px rgba(0,0,0,.3); font-size: 11px; font-weight: 700; }
 :global(.heritage-map-marker span::first-letter) { transform: rotate(45deg); }
+:global(.recommended-map-marker span) { width: 34px; height: 34px; border: 3px solid white; border-radius: 50% 50% 50% 4px; display: grid; place-items: center; transform: rotate(-45deg); color: white; background: #d97706; box-shadow: 0 4px 12px rgba(69,34,0,.35); font-size: 10px; }
+:global(.recommended-map-marker span::first-letter) { transform: rotate(45deg); }
 :global(.leaflet-control-attribution) { font-size: 7px; }
 </style>
