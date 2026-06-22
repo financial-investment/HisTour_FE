@@ -10,7 +10,8 @@ const route = useRoute()
 const router = useRouter()
 const journeyStore = useJourneyStore()
 const video = ref<HTMLVideoElement | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
+const cameraInput = ref<HTMLInputElement | null>(null)
+const uploadInput = ref<HTMLInputElement | null>(null)
 const cameraReady = ref(false)
 const isProcessing = ref(false)
 const errorMessage = ref('')
@@ -41,7 +42,7 @@ function stopCamera() {
 
 async function capturePhoto() {
   if (!video.value || !cameraReady.value) {
-    fileInput.value?.click()
+    cameraInput.value?.click()
     return
   }
   const canvas = document.createElement('canvas')
@@ -57,6 +58,11 @@ async function selectPhoto(event: Event) {
   const file = input.files?.[0]
   if (file) await analyze(file)
   input.value = ''
+}
+
+function openImageUpload() {
+  if (isProcessing.value) return
+  uploadInput.value?.click()
 }
 
 async function analyze(file: File) {
@@ -108,7 +114,7 @@ onBeforeUnmount(stopCamera)
     <header>
       <button type="button" aria-label="닫기" @click="router.back()">×</button>
       <div><i /><span>LIVE VISION</span></div>
-      <button type="button" aria-label="사진 선택" @click="fileInput?.click()">▧</button>
+      <button type="button" aria-label="이미지 업로드" @click="openImageUpload">▧</button>
     </header>
 
     <section class="viewfinder" aria-label="문화재 촬영 영역">
@@ -127,12 +133,27 @@ onBeforeUnmount(stopCamera)
     <p v-if="errorMessage" class="scan-error" role="alert">{{ errorMessage }}</p>
 
     <footer>
-      <button class="side-control" type="button" @click="fileInput?.click()"><span>▧</span>보관함</button>
+      <button class="side-control" type="button" :disabled="isProcessing" @click="openImageUpload"><span>▧</span>이미지 업로드</button>
       <button class="shutter" type="button" aria-label="사진 촬영" :disabled="isProcessing" @click="capturePhoto"><i /></button>
       <button class="side-control" type="button" @click="router.push('/trip')"><span>⌛</span>기록</button>
     </footer>
 
-    <input ref="fileInput" class="hidden-input" type="file" accept="image/*,.heic,.heif" capture="environment" @change="selectPhoto" />
+    <input
+      ref="cameraInput"
+      class="hidden-input"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      @change="selectPhoto"
+    />
+    <input
+      ref="uploadInput"
+      class="hidden-input"
+      type="file"
+      accept="image/*,.heic,.heif"
+      aria-label="문화재 이미지 업로드"
+      @change="selectPhoto"
+    />
 
     <div v-if="isProcessing" class="processing-overlay" aria-live="assertive">
       <span class="status-spinner large" />
@@ -156,7 +177,7 @@ header button { width: 46px; height: 46px; border-radius: 50%; color: white; fon
 .focus-indicator { position: absolute; z-index: 4; width: 58px; height: 58px; border: 1px solid #ffdcc3; transform: translate(-50%,-50%); animation: focus .8s ease-out both; pointer-events: none; }
 .scan-error { position: absolute; z-index: 3; left: 22px; right: 22px; bottom: 155px; padding: 11px 14px; border-radius: 8px; text-align: center; background: rgba(144,16,25,.8); backdrop-filter: blur(8px); font-size: 11px; line-height: 1.45; }
 footer { position: absolute; z-index: 3; left: 0; right: 0; bottom: max(26px,env(safe-area-inset-bottom)); padding: 0 33px; display: flex; align-items: center; justify-content: space-between; }
-.side-control { display: flex; flex-direction: column; align-items: center; gap: 7px; color: rgba(255,255,255,.75); font-size: 9px; }.side-control > span { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; color: white; font-size: 22px; }
+.side-control { max-width: 70px; display: flex; flex-direction: column; align-items: center; gap: 7px; color: rgba(255,255,255,.75); font-size: 9px; line-height: 1.2; }.side-control > span { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; color: white; font-size: 22px; }.side-control:disabled { opacity: .5; }
 .shutter { width: 82px; height: 82px; border: 4px solid rgba(255,255,255,.5); border-radius: 50%; display: grid; place-items: center; background: transparent; }.shutter i { width: 64px; height: 64px; border-radius: 50%; background: white; }.shutter:active { transform: scale(.92); }.shutter:disabled { opacity: .5; }
 .hidden-input { display: none; }.processing-overlay { position: absolute; z-index: 20; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 13px; background: rgba(3,22,50,.78); backdrop-filter: blur(8px); }.processing-overlay strong { font-family: var(--font-serif); font-size: 20px; }.processing-overlay p { color: rgba(255,255,255,.7); font-size: 11px; }
 @keyframes pulse { 50% { opacity: .35; } } @keyframes spin { to { transform: rotate(360deg); } } @keyframes scan { 0%,100% { opacity:.2; transform:translateY(0) } 50% { opacity:.9; transform:translateY(275px) } } @keyframes focus { 0% { opacity:0; scale:1.5 } 25% { opacity:1; scale:1 } 75% { opacity:1 } 100% { opacity:0; scale:.9 } }
