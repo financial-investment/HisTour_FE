@@ -64,15 +64,19 @@ async function loadTrips() {
     if (current) {
       activeTrip.value = await tripApi.getDetail(current.tripId)
       coordinates.value = await getCurrentCoordinates()
-      await loadRecommendations()
-      await nextTick()
-      await renderMap()
     }
   } catch {
     errorMessage.value = '여행 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
   } finally {
     isLoading.value = false
   }
+
+  if (!activeTrip.value || !coordinates.value) return
+
+  await nextTick()
+  await renderMap()
+  await loadRecommendations()
+  await renderMap()
 }
 
 async function createTrip() {
