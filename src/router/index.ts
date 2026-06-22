@@ -1,30 +1,28 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 
-const PUBLIC_PATHS = ['/login', '/register']
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    /* ── 인증 불필요 ─────────────────────────────── */
     {
       path: '/login',
+      name: 'login',
       component: () => import('@/pages/auth/LoginPage.vue'),
       meta: { public: true },
     },
     {
       path: '/register',
+      name: 'register',
       component: () => import('@/pages/auth/RegisterPage.vue'),
       meta: { public: true },
     },
-
-    /* ── AppLayout (바텀 내비 있음) ──────────────── */
     {
       path: '/',
       component: () => import('@/components/layouts/AppLayout.vue'),
       children: [
         {
           path: '',
+          name: 'home',
           component: () => import('@/pages/main/MainPage.vue'),
         },
         {
@@ -37,8 +35,6 @@ const router = createRouter({
         },
       ],
     },
-
-    /* ── 풀스크린 (바텀 내비 없음) ───────────────── */
     {
       path: '/heritage/:heritageId',
       component: () => import('@/pages/heritage/HeritageDetailPage.vue'),
@@ -51,8 +47,6 @@ const router = createRouter({
       path: '/report/:tripId',
       component: () => import('@/pages/report/ReportPage.vue'),
     },
-
-    /* ── 404 ─────────────────────────────────────── */
     {
       path: '/:pathMatch(.*)*',
       component: () => import('@/pages/NotFoundPage.vue'),
@@ -60,15 +54,16 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const userStore = useUserStore()
-  const isPublic = PUBLIC_PATHS.includes(to.path) || to.meta?.public === true
+  await userStore.init()
 
-  if (!isPublic && !userStore.isLoggedIn) {
-    return { path: '/login', query: { redirect: to.fullPath } }
+  const isPublic = to.meta.public === true
+  if (!isPublic && !userStore.isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
-  if (isPublic && userStore.isLoggedIn) {
-    return { path: '/' }
+  if (isPublic && userStore.isAuthenticated) {
+    return { name: 'home' }
   }
 })
 
