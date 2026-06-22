@@ -40,6 +40,14 @@ const router = createRouter({
       component: () => import('@/pages/heritage/HeritageDetailPage.vue'),
     },
     {
+      path: '/trip/:tripId/scan',
+      component: () => import('@/pages/heritage/HeritageScanPage.vue'),
+    },
+    {
+      path: '/heritage/explanation',
+      component: () => import('@/pages/heritage/HeritageExplanationPage.vue'),
+    },
+    {
       path: '/quiz/:tripId',
       component: () => import('@/pages/quiz/QuizPage.vue'),
     },
