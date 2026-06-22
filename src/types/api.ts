@@ -105,29 +105,30 @@ export interface QuizChoiceResponse {
 }
 
 export interface QuizQuestionResponse {
-  quizSessionId: number
+  sessionId: number
   quizId: number
-  sortOrder: number
   heritageId: number
   heritageName: string
   title: string
   content: string
+  source: string
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD' | string
+  sortOrder: number
   choices: QuizChoiceResponse[]
 }
 
 export interface QuizSessionResponse {
   tripId: number
+  totalCount: number
   questions: QuizQuestionResponse[]
 }
 
 export interface QuizResultItemResponse {
-  quizSessionId: number
+  sessionId: number
   quizId: number
-  heritageName: string
-  content: string
   selectedChoiceId: number
-  isCorrect: boolean
-  correctAnswer: string
+  correct: boolean
+  correctChoiceId: number
   explanation: string | null
 }
 
@@ -135,5 +136,6 @@ export interface QuizResultResponse {
   tripId: number
   totalCount: number
   correctCount: number
+  accuracy: number
   results: QuizResultItemResponse[]
 }
