@@ -1,14 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { tripRoutes } from './tripRoutes'
-import { quizRoutes } from './quizRoutes'
-import { reportRoutes } from './reportRoutes'
 import { useUserStore } from '@/stores/userStore'
 
-const PUBLIC_ROUTES = ['/login', '/register']
+const PUBLIC_PATHS = ['/login', '/register']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    /* ── 인증 불필요 ─────────────────────────────── */
     {
       path: '/login',
       component: () => import('@/pages/auth/LoginPage.vue'),
@@ -19,17 +17,42 @@ const router = createRouter({
       component: () => import('@/pages/auth/RegisterPage.vue'),
       meta: { public: true },
     },
+
+    /* ── AppLayout (바텀 내비 있음) ──────────────── */
     {
       path: '/',
-      component: () => import('@/pages/main/MainPage.vue'),
+      component: () => import('@/components/layouts/AppLayout.vue'),
+      children: [
+        {
+          path: '',
+          component: () => import('@/pages/main/MainPage.vue'),
+        },
+        {
+          path: 'mypage',
+          component: () => import('@/pages/mypage/MyPage.vue'),
+        },
+        {
+          path: 'trip',
+          component: () => import('@/pages/trip/TripPage.vue'),
+        },
+      ],
+    },
+
+    /* ── 풀스크린 (바텀 내비 없음) ───────────────── */
+    {
+      path: '/heritage/:heritageId',
+      component: () => import('@/pages/heritage/HeritageDetailPage.vue'),
     },
     {
-      path: '/mypage',
-      component: () => import('@/pages/mypage/MyPage.vue'),
+      path: '/quiz/:tripId',
+      component: () => import('@/pages/quiz/QuizPage.vue'),
     },
-    ...tripRoutes,
-    ...quizRoutes,
-    ...reportRoutes,
+    {
+      path: '/report/:tripId',
+      component: () => import('@/pages/report/ReportPage.vue'),
+    },
+
+    /* ── 404 ─────────────────────────────────────── */
     {
       path: '/:pathMatch(.*)*',
       component: () => import('@/pages/NotFoundPage.vue'),
@@ -39,12 +62,11 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const userStore = useUserStore()
-  const isPublic = PUBLIC_ROUTES.includes(to.path) || to.meta?.public === true
+  const isPublic = PUBLIC_PATHS.includes(to.path) || to.meta?.public === true
 
   if (!isPublic && !userStore.isLoggedIn) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
-
   if (isPublic && userStore.isLoggedIn) {
     return { path: '/' }
   }
