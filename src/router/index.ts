@@ -40,6 +40,10 @@ const router = createRouter({
       component: () => import('@/pages/heritage/HeritageDetailPage.vue'),
     },
     {
+      path: '/quiz',
+      component: () => import('@/pages/quiz/QuizPage.vue'),
+    },
+    {
       path: '/quiz/:tripId',
       component: () => import('@/pages/quiz/QuizPage.vue'),
     },

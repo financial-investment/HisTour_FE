@@ -3,12 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { quizApi, type QuizAnswerSubmitRequest } from '@/api/quizApi'
+import { tripApi } from '@/api/tripApi'
 import type {
   QuizChoiceResponse,
   QuizQuestionResponse,
   QuizResultItemResponse,
   QuizResultResponse,
   QuizSessionResponse,
+  TripResponse,
 } from '@/types/api'
 
 const route = useRoute()
@@ -21,8 +23,15 @@ const currentIndex = ref(0)
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
+const trips = ref<TripResponse[]>([])
 
-const tripId = computed(() => Number(route.params.tripId))
+const tripId = computed(() => {
+  const rawTripId = route.params.tripId
+  const value = Array.isArray(rawTripId) ? rawTripId[0] : rawTripId
+  return value ? Number(value) : null
+})
+const isQuizIndex = computed(() => tripId.value === null)
+const completedTrips = computed(() => trips.value.filter((trip) => trip.status === 'COMPLETED'))
 const questions = computed(() => session.value?.questions ?? [])
 const currentQuestion = computed(() => questions.value[currentIndex.value] ?? null)
 const totalCount = computed(() => session.value?.totalCount ?? questions.value.length)
@@ -38,10 +47,28 @@ const resultBySessionId = computed(() => {
   return new Map(result.value?.results.map((item) => [item.sessionId, item]) ?? [])
 })
 
-onMounted(loadQuiz)
+onMounted(() => {
+  if (tripId.value) {
+    loadQuiz()
+  } else {
+    loadTrips()
+  }
+})
+
+async function loadTrips() {
+  try {
+    isLoading.value = true
+    errorMessage.value = ''
+    trips.value = await tripApi.list()
+  } catch (error) {
+    errorMessage.value = getErrorMessage(error, '여행 목록을 불러오지 못했습니다.')
+  } finally {
+    isLoading.value = false
+  }
+}
 
 async function loadQuiz() {
-  if (!Number.isFinite(tripId.value) || tripId.value <= 0) {
+  if (!tripId.value || !Number.isFinite(tripId.value) || tripId.value <= 0) {
     errorMessage.value = '퀴즈를 불러올 여행 정보가 올바르지 않습니다.'
     isLoading.value = false
     return
@@ -106,6 +133,21 @@ function restartReview() {
   selectedChoiceIds.value = {}
 }
 
+function formatTripTitle(trip: TripResponse) {
+  return trip.title || `${formatDate(trip.tripDate || trip.createdAt)} 여행`
+}
+
+function formatDate(value: string | null) {
+  if (!value) return '날짜 미정'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
+}
+
 function getChoiceContent(question: QuizQuestionResponse, choiceId: number) {
   return question.choices.find((choice) => choice.id === choiceId)?.content ?? ''
 }
@@ -147,13 +189,49 @@ function getErrorMessage(error: unknown, fallback: string) {
         <p>여행 복습</p>
         <h1>히스토리 퀴즈</h1>
       </div>
-      <RouterLink class="icon-button" :to="`/report/${tripId}`" aria-label="리포트 보기">↗</RouterLink>
+      <RouterLink
+        v-if="tripId"
+        class="icon-button"
+        :to="`/report/${tripId}`"
+        aria-label="리포트 보기"
+      >
+        ↗
+      </RouterLink>
+      <RouterLink v-else class="icon-button" to="/trip" aria-label="여행 기록 보기">↗</RouterLink>
     </header>
 
-    <section v-if="errorMessage" class="message-panel">
+    <section v-if="isQuizIndex && !errorMessage" class="trip-selector">
+      <div class="selector-title">
+        <p>퀴즈 시작</p>
+        <h2>완료한 여행을 선택하세요</h2>
+      </div>
+
+      <div v-if="completedTrips.length" class="trip-list">
+        <RouterLink
+          v-for="trip in completedTrips"
+          :key="trip.id"
+          class="trip-card"
+          :to="`/quiz/${trip.id}`"
+        >
+          <div>
+            <strong>{{ formatTripTitle(trip) }}</strong>
+            <span>{{ formatDate(trip.tripDate || trip.createdAt) }}</span>
+          </div>
+          <small>{{ trip.visitCount }}곳 방문</small>
+        </RouterLink>
+      </div>
+
+      <div v-else class="message-panel selector-empty">
+        <strong>아직 퀴즈를 만들 여행이 없어요</strong>
+        <p>완료한 여행 기록이 생기면 이곳에서 바로 퀴즈를 시작할 수 있습니다.</p>
+        <RouterLink to="/trip">여행 기록 보기</RouterLink>
+      </div>
+    </section>
+
+    <section v-else-if="errorMessage" class="message-panel">
       <strong>잠시 멈췄어요</strong>
       <p>{{ errorMessage }}</p>
-      <button type="button" @click="loadQuiz">다시 시도</button>
+      <button type="button" @click="tripId ? loadQuiz() : loadTrips()">다시 시도</button>
     </section>
 
     <template v-else-if="session && currentQuestion">
@@ -299,11 +377,75 @@ function getErrorMessage(error: unknown, fallback: string) {
 .progress-panel,
 .question-card,
 .message-panel,
-.result-hero {
+.result-hero,
+.trip-card {
   border: 1px solid #e4e8ef;
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 10px 24px rgba(23, 47, 80, 0.08);
+}
+
+.trip-selector {
+  margin-top: 22px;
+}
+
+.selector-title p {
+  color: #d97706;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.selector-title h2 {
+  margin-top: 5px;
+  color: #172f50;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.trip-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.trip-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 74px;
+  padding: 16px;
+  color: #17263a;
+  text-decoration: none;
+}
+
+.trip-card strong {
+  display: block;
+  color: #172f50;
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.trip-card span {
+  display: block;
+  margin-top: 4px;
+  color: #778294;
+  font-size: 12px;
+}
+
+.trip-card small {
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: #9a4f03;
+  background: #fff2df;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.selector-empty {
+  margin-top: 16px;
 }
 
 .progress-panel {
