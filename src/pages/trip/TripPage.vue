@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import L, { type Map as LeafletMap } from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import { tripApi } from '@/api/tripApi'
 import { getCurrentCoordinates, type Coordinates } from '@/composables/useGeolocation'
 import type { RecommendedHeritage, TripDetailResponse, TripResponse } from '@/types/api'
+import { loadKakaoMaps, type KakaoMap, type KakaoMapsApi } from '@/utils/kakaoMaps'
 
 const router = useRouter()
 const trips = ref<TripResponse[]>([])
@@ -22,7 +21,10 @@ const isCompleting = ref(false)
 const isLoadingRecommendations = ref(false)
 const showCompleteDialog = ref(false)
 const errorMessage = ref('')
-let map: LeafletMap | null = null
+const mapErrorMessage = ref('')
+let map: KakaoMap | null = null
+let kakaoMaps: KakaoMapsApi | null = null
+let mapObjects: Array<{ setMap(map: KakaoMap | null): void }> = []
 
 const hasActiveTrip = computed(() => Boolean(activeTrip.value))
 const visitedLogs = computed(() => activeTrip.value?.visitLogs ?? [])
@@ -60,7 +62,7 @@ async function loadTrips() {
       coordinates.value = await getCurrentCoordinates()
       await loadRecommendations()
       await nextTick()
-      renderMap()
+      await renderMap()
     }
   } catch {
     errorMessage.value = '여행 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
@@ -82,7 +84,7 @@ async function createTrip() {
     coordinates.value = await getCurrentCoordinates()
     await loadRecommendations()
     await nextTick()
-    renderMap()
+    await renderMap()
   } catch {
     errorMessage.value = '여행을 시작하지 못했어요. 입력 내용을 확인해 주세요.'
   } finally {
@@ -113,10 +115,10 @@ async function loadRecommendations() {
 }
 
 function moveToCurrentLocation() {
-  if (!map || !coordinates.value) return
-  map.flyTo([coordinates.value.lat, coordinates.value.lng], Math.max(map.getZoom(), 15), {
-    duration: 0.7,
-  })
+  if (!map || !coordinates.value || !kakaoMaps) return
+  const currentPosition = new kakaoMaps.LatLng(coordinates.value.lat, coordinates.value.lng)
+  map.panTo(currentPosition)
+  if (map.getLevel() > 4) map.setLevel(4, { anchor: currentPosition, animate: true })
 }
 
 async function refreshNearbyHeritages() {
@@ -124,64 +126,92 @@ async function refreshNearbyHeritages() {
   errorMessage.value = ''
   coordinates.value = await getCurrentCoordinates()
   await loadRecommendations()
-  renderMap()
+  await renderMap()
 }
 
-function renderMap() {
+async function renderMap() {
   if (!mapElement.value || !coordinates.value || !activeTrip.value) return
-  map?.remove()
+  mapErrorMessage.value = ''
 
-  const center: [number, number] = [coordinates.value.lat, coordinates.value.lng]
-  map = L.map(mapElement.value, { zoomControl: false, attributionControl: true }).setView(center, 15)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors',
-  }).addTo(map)
-  L.control.zoom({ position: 'bottomright' }).addTo(map)
+  try {
+    kakaoMaps = await loadKakaoMaps()
+    mapObjects.forEach((object) => object.setMap(null))
+    mapObjects = []
+    mapElement.value.replaceChildren()
 
-  const currentIcon = L.divIcon({
-    className: 'current-location-marker',
-    html: '<span></span>',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-  })
-  L.marker(center, { icon: currentIcon }).addTo(map).bindPopup('현재 위치')
+    const center = new kakaoMaps.LatLng(coordinates.value.lat, coordinates.value.lng)
+    map = new kakaoMaps.Map(mapElement.value, { center, level: 4 })
 
-  const routePoints: Array<[number, number]> = []
-  visitedLogs.value.forEach((log, index) => {
-    const point: [number, number] = [log.lat, log.lng]
-    routePoints.push(point)
-    const icon = L.divIcon({
-      className: 'heritage-map-marker',
-      html: `<span>${index + 1}</span>`,
-      iconSize: [34, 42],
-      iconAnchor: [17, 38],
+    const currentMarker = document.createElement('div')
+    currentMarker.className = 'current-location-marker'
+    currentMarker.title = '현재 위치'
+    currentMarker.innerHTML = '<span></span>'
+    const currentOverlay = new kakaoMaps.CustomOverlay({
+      position: center,
+      content: currentMarker,
+      xAnchor: 0.5,
+      yAnchor: 0.5,
+      zIndex: 3,
     })
-    L.marker(point, { icon }).addTo(map!).bindPopup(log.heritageName)
-  })
+    currentOverlay.setMap(map)
+    mapObjects.push(currentOverlay)
 
-  if (routePoints.length > 1) {
-    L.polyline(routePoints, { color: '#1a365d', weight: 4, opacity: 0.8 }).addTo(map)
-  }
+    const routePoints = visitedLogs.value.map((log, index) => {
+      const position = new kakaoMaps!.LatLng(log.lat, log.lng)
+      const marker = document.createElement('div')
+      marker.className = 'heritage-map-marker'
+      marker.title = log.heritageName
+      marker.innerHTML = `<span>${index + 1}</span>`
+      const overlay = new kakaoMaps!.CustomOverlay({
+        position,
+        content: marker,
+        xAnchor: 0.5,
+        yAnchor: 1,
+        zIndex: 2,
+      })
+      overlay.setMap(map)
+      mapObjects.push(overlay)
+      return position
+    })
 
-  recommendations.value.forEach((heritage) => {
-    const icon = L.divIcon({
-      className: 'recommended-map-marker',
-      html: '<span aria-hidden="true">◆</span>',
-      iconSize: [38, 46],
-      iconAnchor: [19, 42],
-    })
-    L.marker([heritage.lat, heritage.lng], {
-      icon,
-      title: heritage.name,
-      keyboard: true,
-    })
-      .addTo(map!)
-      .bindTooltip(heritage.name, { direction: 'top', offset: [0, -32] })
-      .on('click', () => {
+    if (routePoints.length > 1) {
+      const route = new kakaoMaps.Polyline({
+        path: routePoints,
+        strokeColor: '#1a365d',
+        strokeWeight: 4,
+        strokeOpacity: 0.8,
+        strokeStyle: 'solid',
+      })
+      route.setMap(map)
+      mapObjects.push(route)
+    }
+
+    recommendations.value.forEach((heritage) => {
+      const marker = document.createElement('button')
+      marker.type = 'button'
+      marker.className = 'recommended-map-marker'
+      marker.title = heritage.name
+      marker.setAttribute('aria-label', `${heritage.name}, ${formatDistance(heritage.distanceM)}`)
+      marker.innerHTML = '<span aria-hidden="true">◆</span>'
+      marker.addEventListener('click', () => {
         selectedHeritage.value = heritage
       })
-  })
+      const overlay = new kakaoMaps!.CustomOverlay({
+        position: new kakaoMaps!.LatLng(heritage.lat, heritage.lng),
+        content: marker,
+        xAnchor: 0.5,
+        yAnchor: 1,
+        zIndex: 2,
+      })
+      overlay.setMap(map)
+      mapObjects.push(overlay)
+    })
+  } catch {
+    map = null
+    mapErrorMessage.value = import.meta.env.VITE_KAKAO_MAP_APP_KEY
+      ? '카카오 지도를 불러오지 못했어요. 허용 도메인 설정을 확인해 주세요.'
+      : '카카오 지도 JavaScript 키 설정이 필요해요.'
+  }
 }
 
 async function completeTrip() {
@@ -201,7 +231,11 @@ async function completeTrip() {
 }
 
 onMounted(loadTrips)
-onBeforeUnmount(() => map?.remove())
+onBeforeUnmount(() => {
+  mapObjects.forEach((object) => object.setMap(null))
+  mapObjects = []
+  map = null
+})
 </script>
 
 <template>
@@ -266,6 +300,10 @@ onBeforeUnmount(() => map?.remove())
 
     <section class="map-shell">
       <div ref="mapElement" class="map" aria-label="현재 여행 지도" />
+      <div v-if="mapErrorMessage" class="map-error" role="alert">
+        <strong>지도를 표시할 수 없어요</strong>
+        <span>{{ mapErrorMessage }}</span>
+      </div>
       <div class="map-caption">
         <strong>{{ coordinates?.isFallback ? '서울 중심 지도' : '현재 위치 연결됨' }}</strong>
         <span v-if="isLoadingRecommendations">주변 문화유산을 찾고 있어요.</span>
@@ -383,6 +421,8 @@ label > span { display: block; margin-bottom: 9px; color: #263a56; font-size: 11
 .active-header button { padding: 9px 13px; border-radius: 18px; color: white; background: #142b4c; font-size: 10px; font-weight: 700; }
 .map-shell { position: relative; height: min(59dvh, 560px); min-height: 390px; overflow: hidden; }
 .map { width: 100%; height: 100%; background: #e8e0cf; }
+.map-error { position: absolute; z-index: 600; inset: 0; padding: 28px; display: grid; align-content: center; justify-items: center; text-align: center; background: #edf1f7; }
+.map-error strong { font-family: var(--font-serif); font-size: 17px; }.map-error span { max-width: 270px; margin-top: 6px; color: #687485; font-size: 11px; line-height: 1.5; }
 .map-caption { position: absolute; z-index: 500; top: 16px; left: 16px; padding: 10px 13px; border: 1px solid rgba(255,255,255,.8); border-radius: 8px; display: flex; flex-direction: column; background: rgba(255,255,255,.9); box-shadow: 0 5px 18px rgba(18,39,68,.15); backdrop-filter: blur(8px); }
 .map-caption strong { font-size: 11px; }.map-caption span { margin-top: 2px; color: #6f7a87; font-size: 9px; }
 .map-actions { position: absolute; z-index: 500; top: 16px; right: 16px; display: grid; gap: 8px; }
@@ -417,5 +457,4 @@ label > span { display: block; margin-bottom: 9px; color: #263a56; font-size: 11
 :global(.heritage-map-marker span::first-letter) { transform: rotate(45deg); }
 :global(.recommended-map-marker span) { width: 34px; height: 34px; border: 3px solid white; border-radius: 50% 50% 50% 4px; display: grid; place-items: center; transform: rotate(-45deg); color: white; background: #d97706; box-shadow: 0 4px 12px rgba(69,34,0,.35); font-size: 10px; }
 :global(.recommended-map-marker span::first-letter) { transform: rotate(45deg); }
-:global(.leaflet-control-attribution) { font-size: 7px; }
 </style>
