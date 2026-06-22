@@ -1,9 +1,5 @@
 import apiClient from './apiClient'
-import type {
-  ApiResponse,
-  QuizSessionResponse,
-  QuizResultResponse,
-} from '@/types/api'
+import type { ApiResponse, QuizSessionResponse, QuizResultResponse } from '@/types/api'
 
 export const quizApi = {
   createSession(tripId: number) {
