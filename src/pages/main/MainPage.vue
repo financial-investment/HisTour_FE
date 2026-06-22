@@ -15,6 +15,7 @@ const nearbyHeritages = ref<RecommendedHeritage[]>([])
 const isLoadingNearby = ref(false)
 const nearbyError = ref<'geo' | 'empty' | null>(null)
 const completedTripThumb = ref<string | null>(null)
+const tripsError = ref(false)
 
 const activeTrip = computed(() => trips.value.find((t) => t.status === 'IN_PROGRESS') ?? null)
 const latestCompletedTrip = computed(
@@ -71,13 +72,22 @@ async function loadCompletedTripThumb(tripId: number) {
   }
 }
 
-watch(
-  activeTrip,
-  (trip) => {
-    if (trip) loadNearby(trip.tripId)
-  },
-  { immediate: false },
-)
+watch(activeTrip, (trip) => {
+  if (trip) loadNearby(trip.tripId)
+})
+
+async function loadTrips() {
+  isLoadingTrips.value = true
+  tripsError.value = false
+  try {
+    trips.value = await tripApi.list()
+    if (latestCompletedTrip.value) loadCompletedTripThumb(latestCompletedTrip.value.tripId)
+  } catch {
+    tripsError.value = true
+  } finally {
+    isLoadingTrips.value = false
+  }
+}
 
 onMounted(async () => {
   if (!userStore.user) {
@@ -87,17 +97,7 @@ onMounted(async () => {
       // 조용히 실패
     }
   }
-
-  isLoadingTrips.value = true
-  try {
-    trips.value = await tripApi.list()
-    if (activeTrip.value) loadNearby(activeTrip.value.tripId)
-    if (latestCompletedTrip.value) loadCompletedTripThumb(latestCompletedTrip.value.tripId)
-  } catch {
-    // 조용히 실패
-  } finally {
-    isLoadingTrips.value = false
-  }
+  await loadTrips()
 })
 
 async function handleLogout() {
@@ -206,53 +206,42 @@ function formatDistance(m: number) {
 
         <!-- 주변 문화재 추천 -->
         <div class="nearby-section">
-          <template v-if="activeTrip.visitCount === 0">
-            <div class="nearby-placeholder">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="10" r="3.5" />
-                <path d="M12 2a8 8 0 0 1 8 8c0 5-8 13-8 13S4 15 4 10a8 8 0 0 1 8-8z" />
-              </svg>
-              <p>첫 문화재를 방문하면<br />주변 추천이 시작돼요.</p>
-            </div>
-          </template>
-          <template v-else>
-            <p class="nearby-label">
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <circle cx="8" cy="6.5" r="2.5" />
-                <path
-                  d="M8 1a5.5 5.5 0 0 1 5.5 5.5C13.5 10 8 15 8 15S2.5 10 2.5 6.5A5.5 5.5 0 0 1 8 1z"
+          <p class="nearby-label">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="6.5" r="2.5" />
+              <path
+                d="M8 1a5.5 5.5 0 0 1 5.5 5.5C13.5 10 8 15 8 15S2.5 10 2.5 6.5A5.5 5.5 0 0 1 8 1z"
+              />
+            </svg>
+            근처에 이런 곳도 있어요
+          </p>
+          <div v-if="isLoadingNearby" class="nearby-list">
+            <div v-for="i in 3" :key="i" class="skeleton sk-nearby"></div>
+          </div>
+          <ul v-else-if="nearbyHeritages.length > 0" class="nearby-list">
+            <li v-for="h in nearbyHeritages" :key="h.heritageId">
+              <RouterLink :to="`/heritage/${h.heritageId}`" class="nearby-item">
+                <img
+                  v-if="h.thumbnailUrl"
+                  :src="h.thumbnailUrl"
+                  :alt="h.name"
+                  class="nearby-thumb"
                 />
-              </svg>
-              근처에 이런 곳도 있어요
-            </p>
-            <div v-if="isLoadingNearby" class="nearby-list">
-              <div v-for="i in 3" :key="i" class="skeleton sk-nearby"></div>
-            </div>
-            <ul v-else-if="nearbyHeritages.length > 0" class="nearby-list">
-              <li v-for="h in nearbyHeritages" :key="h.heritageId">
-                <RouterLink :to="`/heritage/${h.heritageId}`" class="nearby-item">
-                  <img
-                    v-if="h.thumbnailUrl"
-                    :src="h.thumbnailUrl"
-                    :alt="h.name"
-                    class="nearby-thumb"
-                  />
-                  <div v-else class="nearby-thumb-placeholder" aria-hidden="true"></div>
-                  <div class="nearby-info">
-                    <span class="nearby-name">{{ h.name }}</span>
-                    <span class="nearby-dist">{{ formatDistance(h.distanceM) }} 거리</span>
-                  </div>
-                  <svg class="nearby-arrow" viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M3 8h10M9 5l4 3-4 3" />
-                  </svg>
-                </RouterLink>
-              </li>
-            </ul>
-            <p v-else-if="nearbyError === 'geo'" class="nearby-empty">
-              위치 권한이 필요해요. 브라우저 설정을 확인해 주세요.
-            </p>
-            <p v-else class="nearby-empty">현재 위치 주변에 추천할 문화재가 없어요.</p>
-          </template>
+                <div v-else class="nearby-thumb-placeholder" aria-hidden="true"></div>
+                <div class="nearby-info">
+                  <span class="nearby-name">{{ h.name }}</span>
+                  <span class="nearby-dist">{{ formatDistance(h.distanceM) }} 거리</span>
+                </div>
+                <svg class="nearby-arrow" viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M3 8h10M9 5l4 3-4 3" />
+                </svg>
+              </RouterLink>
+            </li>
+          </ul>
+          <p v-else-if="nearbyError === 'geo'" class="nearby-empty">
+            위치 권한이 필요해요. 브라우저 설정을 확인해 주세요.
+          </p>
+          <p v-else class="nearby-empty">현재 위치 주변에 추천할 문화재가 없어요.</p>
         </div>
       </template>
 
@@ -333,6 +322,12 @@ function formatDistance(m: number) {
           </span>
         </div>
       </RouterLink>
+
+      <!-- 여행 목록 조회 실패 -->
+      <div v-else-if="tripsError" class="error-card">
+        <p>여행 목록을 불러오지 못했어요.</p>
+        <button class="retry-btn" @click="loadTrips">다시 시도</button>
+      </div>
 
       <!-- 완료된 여행 없음 -->
       <div v-else-if="!isLoadingTrips" class="guide-card">
@@ -972,6 +967,35 @@ function formatDistance(m: number) {
 }
 
 /* 서비스 가이드 */
+.error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 18px;
+  background: var(--color-surface-lowest);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.retry-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-primary-container);
+  color: var(--color-on-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+.retry-btn:hover {
+  opacity: 0.85;
+}
+
 .guide-card {
   padding: 22px;
   border: 1px solid var(--color-outline-variant);
