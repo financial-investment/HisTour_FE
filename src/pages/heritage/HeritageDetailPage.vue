@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onBeforeUnmount, nextTick, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { heritageApi } from '@/api/heritageApi'
+import { loadKakaoMaps } from '@/utils/kakaoMaps'
 import type { HeritageDetailResponse } from '@/types/api'
 import ImageCarousel from '@/components/common/ImageCarousel.vue'
 
@@ -24,6 +25,9 @@ const router = useRouter()
 const heritage = ref<HeritageDetailResponse | null>(null)
 const isLoading = ref(true)
 const error = ref(false)
+const mapElement = ref<HTMLElement | null>(null)
+const mapError = ref(false)
+let mapObject: { setMap?: (m: null) => void } | null = null
 
 const heroImage = computed(() =>
   heritage.value?.mediaUrls[0] ?? heritage.value?.thumbnailUrl ?? null,
@@ -43,6 +47,29 @@ const kakaoMapUrl = computed(() => {
   return `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`
 })
 
+async function renderMap() {
+  if (!mapElement.value || !heritage.value) return
+  try {
+    const kakaoMaps = await loadKakaoMaps()
+    const position = new kakaoMaps.LatLng(heritage.value.lat, heritage.value.lng)
+    const map = new kakaoMaps.Map(mapElement.value, { center: position, level: 4 })
+
+    const markerEl = document.createElement('div')
+    markerEl.className = 'heritage-map-pin'
+    markerEl.title = heritage.value.name
+    const overlay = new kakaoMaps.CustomOverlay({
+      position,
+      content: markerEl,
+      xAnchor: 0.5,
+      yAnchor: 1,
+    })
+    overlay.setMap(map)
+    mapObject = overlay
+  } catch {
+    mapError.value = true
+  }
+}
+
 onMounted(async () => {
   try {
     const id = Number(route.params.heritageId)
@@ -52,6 +79,13 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+  await nextTick()
+  await renderMap()
+})
+
+onBeforeUnmount(() => {
+  mapObject?.setMap?.(null)
+  mapObject = null
 })
 </script>
 
@@ -125,21 +159,17 @@ onMounted(async () => {
         <!-- 위치 정보 -->
         <section class="section">
           <p class="section-label">위치 정보</p>
-          <div class="location-card">
-            <div class="coords">
-              <span class="coord-label">위도</span>
-              <span class="coord-val">{{ heritage.lat.toFixed(5) }}</span>
-              <span class="coord-label">경도</span>
-              <span class="coord-val">{{ heritage.lng.toFixed(5) }}</span>
-            </div>
-            <a :href="kakaoMapUrl" target="_blank" rel="noopener" class="map-link">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M8 2C5.79 2 4 3.79 4 6c0 3 4 8 4 8s4-5 4-8c0-2.21-1.79-4-4-4Z" />
-                <circle cx="8" cy="6" r="1.5" />
-              </svg>
-              지도에서 보기
-            </a>
+          <div class="map-wrap">
+            <div ref="mapElement" class="map-canvas" aria-label="문화재 위치 지도" />
+            <p v-if="mapError" class="map-error">지도를 불러올 수 없어요.</p>
           </div>
+          <a :href="kakaoMapUrl" target="_blank" rel="noopener" class="map-link">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 2C5.79 2 4 3.79 4 6c0 3 4 8 4 8s4-5 4-8c0-2.21-1.79-4-4-4Z" />
+              <circle cx="8" cy="6" r="1.5" />
+            </svg>
+            카카오맵에서 보기
+          </a>
         </section>
       </div>
     </template>
@@ -275,40 +305,32 @@ onMounted(async () => {
 }
 
 /* location */
-.location-card {
-  background: var(--color-surface-high);
+.map-wrap {
+  position: relative;
   border-radius: 14px;
-  padding: 16px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.map-canvas {
+  width: 100%;
+  height: 200px;
+  background: var(--color-surface-high);
+}
+
+.map-error {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.coords {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 2px 10px;
-  align-items: center;
-}
-
-.coord-label {
-  font-size: 10px;
-  font-weight: 600;
+  justify-content: center;
+  font-size: 12px;
   color: var(--color-outline);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.coord-val {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-on-surface);
-  font-variant-numeric: tabular-nums;
+  background: var(--color-surface-high);
 }
 
 .map-link {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 8px 14px;
@@ -318,11 +340,19 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 600;
   text-decoration: none;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 .map-link svg {
   width: 14px;
+}
+
+:global(.heritage-map-pin) {
+  width: 28px;
+  height: 28px;
+  border: 3px solid white;
+  border-radius: 50% 50% 50% 4px;
+  background: var(--color-primary);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  transform: rotate(-45deg);
 }
 
 /* skeleton */
