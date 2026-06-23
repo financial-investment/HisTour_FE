@@ -9,6 +9,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const trips = ref<TripResponse[]>([])
 const isLoading = ref(false)
+const isLoggingOut = ref(false)
 
 const completedTrips = computed(() =>
   trips.value
@@ -37,9 +38,16 @@ function formatDate(tripDate: string | null, createdAt: string) {
   return raw.slice(0, 10).replace(/-/g, '.')
 }
 
-function handleLogout() {
-  userStore.logout()
-  router.push('/login')
+async function handleLogout() {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+
+  try {
+    await userStore.logout()
+  } finally {
+    await router.replace('/login')
+    isLoggingOut.value = false
+  }
 }
 </script>
 
@@ -66,7 +74,12 @@ function handleLogout() {
           <h1 class="profile-name">{{ userStore.user?.nickname ?? '여행자' }}</h1>
           <p class="profile-email">{{ userStore.user?.email }}</p>
         </div>
-        <button class="logout-btn" aria-label="로그아웃" @click="handleLogout">
+        <button
+          class="logout-btn"
+          aria-label="로그아웃"
+          :disabled="isLoggingOut"
+          @click="handleLogout"
+        >
           <svg
             viewBox="0 0 20 20"
             fill="none"
@@ -294,6 +307,10 @@ function handleLogout() {
 .logout-btn:hover {
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
+}
+.logout-btn:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 .logout-btn svg {
   width: 18px;
