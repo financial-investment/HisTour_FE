@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { quizApi, type QuizAnswerSubmitRequest } from '@/api/quizApi'
 import { tripApi } from '@/api/tripApi'
+import { loadQuizResult, saveQuizResult } from '@/utils/quizResultStorage'
 import type {
   QuizChoiceResponse,
   QuizQuestionResponse,
@@ -101,6 +102,7 @@ async function loadQuiz() {
         throw error
       }
     }
+    restoreSavedResult()
     currentIndex.value = 0
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '퀴즈를 준비하지 못했습니다.')
@@ -137,6 +139,7 @@ async function submitQuiz() {
     isSubmitting.value = true
     errorMessage.value = ''
     result.value = await quizApi.submitResults(answers)
+    saveQuizResult(result.value)
     openResultId.value = result.value.results[0]?.sessionId ?? null
     currentIndex.value = 0
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -152,6 +155,20 @@ function restartReview() {
   result.value = null
   openResultId.value = null
   selectedChoiceIds.value = {}
+}
+
+function restoreSavedResult() {
+  if (!tripId.value) return
+
+  const savedResult = loadQuizResult(tripId.value)
+  if (!savedResult) return
+
+  result.value = savedResult
+  selectedChoiceIds.value = savedResult.results.reduce<Record<number, number>>((answers, item) => {
+    answers[item.sessionId] = item.selectedChoiceId
+    return answers
+  }, {})
+  openResultId.value = savedResult.results[0]?.sessionId ?? null
 }
 
 function getTripId(trip: TripLike) {

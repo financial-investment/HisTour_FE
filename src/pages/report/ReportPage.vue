@@ -3,12 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { reportApi } from '@/api/reportApi'
-import type { CourseHeritage, ReportResponse, VisitedHeritage } from '@/types/api'
+import { loadQuizResult } from '@/utils/quizResultStorage'
+import type { CourseHeritage, QuizResultResponse, ReportResponse, VisitedHeritage } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 
 const report = ref<ReportResponse | null>(null)
+const quizResult = ref<QuizResultResponse | null>(null)
 const isLoading = ref(true)
 const errorMessage = ref('')
 
@@ -37,6 +39,12 @@ const courseTitle = computed(() => {
   if (!course) return '추천 코스 준비 중'
   return `${course.regionName} 추천 코스`
 })
+const quizResultMessage = computed(() => {
+  const accuracy = quizResult.value?.accuracy ?? 0
+  if (accuracy >= 80) return 'Strong recall from this journey'
+  if (accuracy >= 50) return 'Good review checkpoint'
+  return 'Review recommended'
+})
 
 onMounted(loadReport)
 
@@ -51,6 +59,7 @@ async function loadReport() {
     isLoading.value = true
     errorMessage.value = ''
     report.value = await reportApi.get(tripId.value)
+    quizResult.value = loadQuizResult(tripId.value)
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '여행 리포트를 불러오지 못했습니다.')
   } finally {
@@ -206,8 +215,16 @@ function getErrorMessage(error: unknown, fallback: string) {
         </div>
       </section>
 
-      <section class="quiz-cta">
+      <section class="quiz-cta" :class="{ completed: quizResult }">
         <h2>Knowledge Verification</h2>
+        <template v-if="quizResult">
+          <div class="quiz-result-card">
+            <span>{{ quizResultMessage }}</span>
+            <strong>{{ quizResult.correctCount }}/{{ quizResult.totalCount }}</strong>
+            <small>{{ quizResult.accuracy }}% accuracy</small>
+          </div>
+          <RouterLink class="result-link" :to="`/quiz/${report.tripId}`">View Quiz Result</RouterLink>
+        </template>
         <p>여행 후 퀴즈로 방금 정리한 기록을 오래 남겨보세요.</p>
         <RouterLink :to="`/quiz/${report.tripId}`">Start Quiz</RouterLink>
       </section>
@@ -626,6 +643,42 @@ function getErrorMessage(error: unknown, fallback: string) {
   color: #44474d;
   font-size: 14px;
   line-height: 1.6;
+}
+
+.quiz-cta.completed > p,
+.quiz-cta.completed > a:not(.result-link) {
+  display: none;
+}
+
+.quiz-result-card {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0 20px;
+  padding: 22px;
+  border: 1px solid #c5c6ce;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.quiz-result-card span {
+  color: #5c5f60;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quiz-result-card strong {
+  color: #031632;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 42px;
+  line-height: 1;
+}
+
+.quiz-result-card small {
+  color: #1a2b48;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .quiz-cta a {
