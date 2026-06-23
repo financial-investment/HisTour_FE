@@ -94,8 +94,12 @@ async function loadQuiz() {
     errorMessage.value = ''
     try {
       session.value = await quizApi.getSession(tripId.value)
-    } catch {
-      session.value = await quizApi.createSession(tripId.value)
+    } catch (error: unknown) {
+      if (getResponseStatus(error) === 404) {
+        session.value = await quizApi.createSession(tripId.value)
+      } else {
+        throw error
+      }
     }
     currentIndex.value = 0
   } catch (error) {
@@ -199,6 +203,20 @@ function getErrorMessage(error: unknown, fallback: string) {
     return data.message || fallback
   }
   return fallback
+}
+
+function getResponseStatus(error: unknown) {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof error.response === 'object' &&
+    error.response !== null &&
+    'status' in error.response
+  ) {
+    return error.response.status
+  }
+  return undefined
 }
 </script>
 
