@@ -148,13 +148,6 @@ async function submitQuiz() {
   }
 }
 
-function restartReview() {
-  currentIndex.value = 0
-  result.value = null
-  openResultId.value = null
-  selectedChoiceIds.value = {}
-}
-
 async function restoreSubmittedResult() {
   if (!tripId.value) return
 
@@ -408,7 +401,6 @@ function getResponseStatus(error: unknown) {
 
       <div class="result-actions">
         <RouterLink to="/">Home</RouterLink>
-        <button type="button" @click="restartReview">다시 풀기</button>
       </div>
     </template>
 
