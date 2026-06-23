@@ -1,6 +1,11 @@
 import apiClient from './apiClient'
 import type { ApiResponse, QuizSessionResponse, QuizResultResponse } from '@/types/api'
 
+export interface QuizAnswerSubmitRequest {
+  sessionId: number
+  choiceId: number
+}
+
 export const quizApi = {
   createSession(tripId: number) {
     return apiClient
@@ -14,11 +19,15 @@ export const quizApi = {
       .then((r) => r.data.data)
   },
 
-  submitAnswers(answers: Array<{ sessionId: number; choiceId: number }>) {
+  submitResults(answers: QuizAnswerSubmitRequest[]) {
     return apiClient
       .post<ApiResponse<QuizResultResponse>>('/api/quiz/results', {
         answers,
       })
       .then((r) => r.data.data)
+  },
+
+  submitAnswers(answers: QuizAnswerSubmitRequest[]) {
+    return this.submitResults(answers)
   },
 }

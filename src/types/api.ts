@@ -111,7 +111,6 @@ export interface QuizChoiceResponse {
 export interface QuizQuestionResponse {
   sessionId: number
   quizId: number
-  sortOrder: number
   heritageId: number
   heritageName: string
   title: string
