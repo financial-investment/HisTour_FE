@@ -41,11 +41,6 @@ const periodLabel = computed(() =>
   heritage.value?.period ? (PERIOD_NAMES[heritage.value.period] ?? heritage.value.period) : null,
 )
 
-const kakaoMapUrl = computed(() => {
-  if (!heritage.value) return '#'
-  const { lat, lng, name } = heritage.value
-  return `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`
-})
 
 async function renderMap() {
   if (!mapElement.value || !heritage.value) return
@@ -160,16 +155,9 @@ onBeforeUnmount(() => {
         <section class="section">
           <p class="section-label">위치 정보</p>
           <div class="map-wrap">
-            <div ref="mapElement" class="map-canvas" aria-label="문화재 위치 지도" />
-            <p v-if="mapError" class="map-error">지도를 불러올 수 없어요.</p>
+            <div v-if="!mapError" ref="mapElement" class="map-canvas" aria-label="문화재 위치 지도" />
+            <p v-else class="map-error">지도를 불러올 수 없어요.</p>
           </div>
-          <a :href="kakaoMapUrl" target="_blank" rel="noopener" class="map-link">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M8 2C5.79 2 4 3.79 4 6c0 3 4 8 4 8s4-5 4-8c0-2.21-1.79-4-4-4Z" />
-              <circle cx="8" cy="6" r="1.5" />
-            </svg>
-            카카오맵에서 보기
-          </a>
         </section>
       </div>
     </template>
@@ -306,10 +294,8 @@ onBeforeUnmount(() => {
 
 /* location */
 .map-wrap {
-  position: relative;
   border-radius: 14px;
   overflow: hidden;
-  margin-bottom: 10px;
 }
 
 .map-canvas {
@@ -319,30 +305,14 @@ onBeforeUnmount(() => {
 }
 
 .map-error {
-  position: absolute;
-  inset: 0;
+  height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 14px;
   font-size: 12px;
   color: var(--color-outline);
   background: var(--color-surface-high);
-}
-
-.map-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-}
-.map-link svg {
-  width: 14px;
 }
 
 :global(.heritage-map-pin) {

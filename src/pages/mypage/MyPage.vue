@@ -53,7 +53,7 @@ const avgVisits = computed(() => {
 })
 
 const allVisitLogs = computed(() =>
-  completedTrips.value
+  trips.value
     .flatMap((t) => tripDetailMap.value[t.tripId]?.logs ?? [])
     .sort((a, b) => new Date(b.visitedAt).getTime() - new Date(a.visitedAt).getTime()),
 )
@@ -70,18 +70,22 @@ const categoryItems = computed(() =>
 )
 
 async function loadTripDetails() {
-  if (completedTrips.value.length === 0) return
+  if (trips.value.length === 0) return
   isLoadingDetails.value = true
 
   const map: Record<number, { thumb: string | null; logs: VisitLogResponse[] }> = {}
   await Promise.all(
-    completedTrips.value.map(async (trip) => {
+    trips.value.map(async (trip) => {
       try {
         const detail = await tripApi.getDetail(trip.tripId)
-        map[trip.tripId] = {
-          thumb: detail.visitLogs.find((l) => l.photoUrl)?.photoUrl ?? null,
-          logs: detail.visitLogs,
+        let thumb = detail.visitLogs.find((l) => l.photoUrl)?.photoUrl ?? null
+        if (!thumb && detail.visitLogs.length > 0) {
+          try {
+            const h = await heritageApi.getDetail(detail.visitLogs[0].heritageId)
+            thumb = h.thumbnailUrl ?? null
+          } catch {}
         }
+        map[trip.tripId] = { thumb, logs: detail.visitLogs }
       } catch {
         map[trip.tripId] = { thumb: null, logs: [] }
       }
@@ -94,7 +98,7 @@ async function loadTripDetails() {
 }
 
 async function loadHeritageStats() {
-  const allLogs = completedTrips.value.flatMap((t) => tripDetailMap.value[t.tripId]?.logs ?? [])
+  const allLogs = trips.value.flatMap((t) => tripDetailMap.value[t.tripId]?.logs ?? [])
   const uniqueIds = [...new Set(allLogs.map((l) => l.heritageId))]
   if (uniqueIds.length === 0) return
 
