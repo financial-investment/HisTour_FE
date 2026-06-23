@@ -36,16 +36,16 @@ const router = createRouter({
       ],
     },
     {
-      path: '/heritage/:heritageId',
-      component: () => import('@/pages/heritage/HeritageDetailPage.vue'),
+      path: '/heritage/explanation',
+      component: () => import('@/pages/heritage/HeritageExplanationPage.vue'),
     },
     {
       path: '/trip/:tripId/scan',
       component: () => import('@/pages/heritage/HeritageScanPage.vue'),
     },
     {
-      path: '/heritage/explanation',
-      component: () => import('@/pages/heritage/HeritageExplanationPage.vue'),
+      path: '/heritage/:heritageId',
+      component: () => import('@/pages/heritage/HeritageDetailPage.vue'),
     },
     {
       path: '/quiz/:tripId',
