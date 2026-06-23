@@ -6,7 +6,6 @@ import type { RecommendedHeritage, VisitLogResponse } from '@/types/api'
 import { loadKakaoMaps, type KakaoMap, type KakaoMapsApi } from '@/utils/kakaoMaps'
 
 const props = defineProps<{
-  tripId: number
   coordinates: Coordinates | null
   recommendations: RecommendedHeritage[]
   selectedHeritage: RecommendedHeritage | null
@@ -208,22 +207,9 @@ defineExpose({ renderMap })
         <strong>{{ selectedHeritage.name }}</strong>
         <div class="preview-links">
           <RouterLink :to="`/heritage/${selectedHeritage.heritageId}`">상세 보기</RouterLink>
-          <RouterLink class="scan-link" :to="`/trip/${tripId}/scan`">
-            <svg viewBox="0 0 24 24">
-              <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M8 12h8" />
-            </svg>
-            스캔하기
-          </RouterLink>
         </div>
       </div>
     </article>
-
-    <RouterLink v-else class="scan-button" :to="`/trip/${tripId}/scan`" aria-label="문화재 스캔">
-      <svg viewBox="0 0 24 24">
-        <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M8 12h8" />
-      </svg>
-      <span>문화재 스캔</span>
-    </RouterLink>
   </section>
 </template>
 
@@ -395,42 +381,6 @@ defineExpose({ renderMap })
   font-size: 10px;
   font-weight: 700;
 }
-.preview-links .scan-link {
-  border-color: #142b4c;
-  gap: 5px;
-  color: white;
-  background: #142b4c;
-}
-.preview-links svg {
-  width: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-}
-
-.scan-button {
-  position: absolute;
-  z-index: 500;
-  right: 18px;
-  bottom: 18px;
-  padding: 13px 17px;
-  border-radius: 28px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: white;
-  background: #142b4c;
-  box-shadow: 0 8px 22px rgba(20, 43, 76, 0.3);
-  font-size: 11px;
-  font-weight: 700;
-}
-.scan-button svg {
-  width: 21px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);

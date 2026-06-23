@@ -8,6 +8,7 @@ import TripActiveHeader from './components/TripActiveHeader.vue'
 import TripCompleteDialog from './components/TripCompleteDialog.vue'
 import TripCreatePanel from './components/TripCreatePanel.vue'
 import TripMapSection from './components/TripMapSection.vue'
+import TripRecommendationSection from './components/TripRecommendationSection.vue'
 import TripVisitedSection from './components/TripVisitedSection.vue'
 
 const router = useRouter()
@@ -153,12 +154,19 @@ onMounted(loadTrips)
     <TripMapSection
       ref="mapSection"
       v-model:selected-heritage="selectedHeritage"
-      :trip-id="activeTrip.tripId"
       :coordinates="coordinates"
       :recommendations="recommendations"
       :visited-logs="visitedLogs"
       :is-loading-recommendations="isLoadingRecommendations"
       @refresh="refreshNearbyHeritages"
+    />
+
+    <TripRecommendationSection
+      :trip-id="activeTrip.tripId"
+      :recommendations="recommendations"
+      :selected-heritage="selectedHeritage"
+      :is-loading="isLoadingRecommendations"
+      @select="selectedHeritage = $event"
     />
 
     <TripVisitedSection :logs="visitedLogs" :error-message="errorMessage" />
