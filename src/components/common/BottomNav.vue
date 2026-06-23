@@ -26,11 +26,19 @@ function isActive(path: string) {
       :class="{ active: isActive(tab.path) }"
     >
       <!-- Home icon -->
-      <svg v-if="tab.icon === 'home'" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        v-if="tab.icon === 'home'"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           v-if="!isActive(tab.path)"
           d="M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.55 5.45 21 6 21H9V16H15V21H18C18.55 21 19 20.55 19 20V10M9 21H15"
-          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         />
         <path
           v-else
@@ -40,11 +48,19 @@ function isActive(path: string) {
       </svg>
 
       <!-- Active Trip (navigation arrow) icon -->
-      <svg v-if="tab.icon === 'trip'" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        v-if="tab.icon === 'trip'"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           v-if="!isActive(tab.path)"
           d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"
-          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         />
         <path
           v-else
@@ -54,11 +70,19 @@ function isActive(path: string) {
       </svg>
 
       <!-- Profile icon -->
-      <svg v-if="tab.icon === 'profile'" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        v-if="tab.icon === 'profile'"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           v-if="!isActive(tab.path)"
           d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"
-          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
           fill="none"
         />
         <path

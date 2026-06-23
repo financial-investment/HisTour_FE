@@ -1,5 +1,3 @@
-import heic2any from 'heic2any'
-
 export async function fileToBase64(file: File): Promise<string> {
   const converted = await convertIfHeic(file)
   return new Promise((resolve, reject) => {
@@ -22,6 +20,7 @@ async function convertIfHeic(file: File): Promise<File | Blob> {
 
   if (!isHeic) return file
 
+  const { default: heic2any } = await import('heic2any')
   const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 })
   const blob = Array.isArray(result) ? result[0] : result
   if (!blob) throw new Error('HEIC 변환 실패')

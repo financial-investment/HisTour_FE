@@ -37,25 +37,29 @@ export interface ExplainResponse {
 }
 
 export interface TripResponse {
-  id: number
+  tripId: number
   title: string | null
   tripDate: string | null
   status: 'IN_PROGRESS' | 'COMPLETED'
   visitCount: number
   createdAt: string
+  visitLogs?: VisitLogResponse[]
 }
 
 export interface VisitLogResponse {
   id: number
+  tripId: number
   heritageId: number
   heritageName: string
   photoUrl: string | null
+  lat: number
+  lng: number
   explanation: string | null
   visitedAt: string
 }
 
 export interface TripDetailResponse {
-  id: number
+  tripId: number
   title: string | null
   tripDate: string | null
   status: 'IN_PROGRESS' | 'COMPLETED'
@@ -100,7 +104,7 @@ export interface ReportResponse {
 }
 
 export interface QuizChoiceResponse {
-  id: number
+  choiceId: number
   content: string
 }
 
@@ -112,8 +116,7 @@ export interface QuizQuestionResponse {
   title: string
   content: string
   source: string
-  difficulty: 'EASY' | 'MEDIUM' | 'HARD' | string
-  sortOrder: number
+  difficulty: string
   choices: QuizChoiceResponse[]
 }
 
@@ -127,9 +130,14 @@ export interface QuizResultItemResponse {
   sessionId: number
   quizId: number
   selectedChoiceId: number
-  correct: boolean
   correctChoiceId: number
+  correct: boolean
   explanation: string | null
+}
+
+export interface HeritageCategoryStats {
+  category: string
+  total: number
 }
 
 export interface QuizResultResponse {

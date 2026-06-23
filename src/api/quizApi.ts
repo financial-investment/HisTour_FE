@@ -1,9 +1,5 @@
 import apiClient from './apiClient'
-import type {
-  ApiResponse,
-  QuizSessionResponse,
-  QuizResultResponse,
-} from '@/types/api'
+import type { ApiResponse, QuizSessionResponse, QuizResultResponse } from '@/types/api'
 
 export interface QuizAnswerSubmitRequest {
   sessionId: number
@@ -29,5 +25,9 @@ export const quizApi = {
         answers,
       })
       .then((r) => r.data.data)
+  },
+
+  submitAnswers(answers: QuizAnswerSubmitRequest[]) {
+    return this.submitResults(answers)
   },
 }

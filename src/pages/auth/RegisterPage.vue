@@ -192,15 +192,14 @@ async function submitSignUp() {
 
 <style scoped>
 .signup-page {
-  --navy: #1b3152;
   width: min(100%, var(--mobile-max-width));
   min-height: 100dvh;
   margin: 0 auto;
   padding: 22px 18px 32px;
-  color: #222a35;
+  color: var(--color-text-base);
   background:
     radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.9) 0 18%, transparent 52%),
-    #f7f8fd;
+    var(--color-bg);
 }
 
 .page-header {
@@ -213,16 +212,16 @@ async function submitSignUp() {
   display: grid;
   width: 42px;
   height: 42px;
-  border: 1px solid #e0e3e9;
+  border: 1px solid var(--color-outline-variant);
   border-radius: 50%;
   place-items: center;
-  background: #fff;
+  background: var(--color-surface-lowest);
 }
 
 .back-button > svg {
   width: 21px;
   fill: none;
-  stroke: var(--navy);
+  stroke: var(--color-primary-container);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2;
@@ -235,7 +234,7 @@ async function submitSignUp() {
   margin: auto;
   border-radius: 12px;
   place-items: center;
-  background: var(--navy);
+  background: var(--color-primary-container);
 }
 
 .mini-brand svg {
@@ -244,14 +243,14 @@ async function submitSignUp() {
 
 .mini-brand path {
   fill: none;
-  stroke: #f9ead7;
+  stroke: var(--color-accent-pale);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 8;
 }
 
 .mini-brand circle {
-  fill: #e87505;
+  fill: var(--color-accent);
 }
 
 .intro {
@@ -259,14 +258,14 @@ async function submitSignUp() {
 }
 
 .intro p {
-  color: #e87505;
+  color: var(--color-accent);
   font-size: 14px;
   font-weight: 700;
 }
 
 .intro h1 {
   margin-top: 6px;
-  color: #102b4d;
+  color: var(--color-primary-container);
   font-size: 27px;
   letter-spacing: -1.2px;
 }
@@ -274,16 +273,16 @@ async function submitSignUp() {
 .intro span {
   display: block;
   margin-top: 10px;
-  color: #777d86;
+  color: var(--color-text-subtle);
   font-size: 13px;
 }
 
 .signup-card {
   padding: 28px 30px 30px;
-  border: 1px solid #dcdee3;
+  border: 1px solid var(--color-outline-variant);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 12px 30px rgba(35, 46, 70, 0.04);
+  box-shadow: var(--shadow-md);
 }
 
 .field-group + .field-group {
@@ -291,7 +290,7 @@ async function submitSignUp() {
 }
 
 label {
-  color: #4e5155;
+  color: var(--color-on-surface-variant);
   font-size: 13px;
 }
 
@@ -299,15 +298,17 @@ label {
   display: flex;
   height: 52px;
   margin-top: 8px;
-  border: 1px solid #737a84;
+  border: 1px solid var(--color-outline);
   border-radius: 2px;
   align-items: center;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 
 .input-wrap:focus-within {
-  border-color: var(--navy);
-  box-shadow: 0 0 0 3px rgba(27, 49, 82, 0.1);
+  border-color: var(--color-primary-container);
+  box-shadow: 0 0 0 3px rgba(26, 43, 72, 0.1);
 }
 
 .input-wrap svg {
@@ -315,7 +316,7 @@ label {
   margin: 0 14px;
   flex: 0 0 auto;
   fill: none;
-  stroke: #777b82;
+  stroke: var(--color-text-subtle);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
@@ -327,19 +328,19 @@ label {
   padding-right: 10px;
   border: 0;
   outline: 0;
-  color: #10223d;
+  color: var(--color-primary-container);
   background: transparent;
   font-size: 15px;
 }
 
 .input-wrap input::placeholder {
-  color: #9398a0;
+  color: var(--color-text-muted);
 }
 
 .form-message {
   min-height: 18px;
   margin-top: 14px;
-  color: #c64242;
+  color: var(--color-error);
   font-size: 12px;
 }
 
@@ -352,11 +353,16 @@ label {
   border-radius: 2px;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  background: var(--navy);
+  color: var(--color-on-primary);
+  background: var(--color-primary-container);
   cursor: pointer;
   font-size: 16px;
   font-weight: 600;
+  transition: background var(--transition);
+}
+
+.signup-button:hover:not(:disabled) {
+  background: var(--color-primary-gradient);
 }
 
 .signup-button:disabled {
@@ -368,21 +374,21 @@ label {
   width: 21px;
   height: 21px;
   border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
+  border-top-color: var(--color-on-primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
 
 .login-link {
   margin-top: 28px;
-  color: #6c7178;
+  color: var(--color-on-surface-variant);
   text-align: center;
   font-size: 13px;
 }
 
 .login-link a {
   margin-left: 4px;
-  color: var(--navy);
+  color: var(--color-primary-container);
   font-weight: 700;
   text-decoration: none;
 }
@@ -400,7 +406,9 @@ label {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 360px) {

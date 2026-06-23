@@ -109,7 +109,7 @@ function selectChoice(question: QuizQuestionResponse, choice: QuizChoiceResponse
   if (result.value || isSubmitting.value) return
   selectedChoiceIds.value = {
     ...selectedChoiceIds.value,
-    [question.sessionId]: choice.id,
+    [question.sessionId]: choice.choiceId,
   }
 }
 
@@ -151,7 +151,7 @@ function restartReview() {
 }
 
 function getTripId(trip: TripLike) {
-  return trip.id ?? trip.tripId ?? null
+  return trip.tripId ?? null
 }
 
 function formatTripTitle(trip: TripLike) {
@@ -170,7 +170,7 @@ function formatDate(value: string | null) {
 }
 
 function getChoiceContent(question: QuizQuestionResponse, choiceId: number) {
-  return question.choices.find((choice) => choice.id === choiceId)?.content ?? ''
+  return question.choices.find((choice) => choice.choiceId === choiceId)?.content ?? ''
 }
 
 function getDifficultyLabel(difficulty: string) {
@@ -274,9 +274,9 @@ function getErrorMessage(error: unknown, fallback: string) {
       <section class="choice-list">
         <button
           v-for="choice in currentQuestion.choices"
-          :key="choice.id"
+          :key="choice.choiceId"
           class="choice-button"
-          :class="{ selected: selectedChoiceIds[currentQuestion.sessionId] === choice.id }"
+          :class="{ selected: selectedChoiceIds[currentQuestion.sessionId] === choice.choiceId }"
           type="button"
           @click="selectChoice(currentQuestion, choice)"
         >

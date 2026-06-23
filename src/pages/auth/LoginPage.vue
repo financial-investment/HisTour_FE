@@ -139,7 +139,9 @@ function showPendingNotice(feature: string) {
         <RouterLink to="/register">회원가입</RouterLink>
       </p>
       <nav aria-label="정책 링크">
-        <button type="button" @click="showPendingNotice('개인정보처리방침')">개인정보처리방침</button>
+        <button type="button" @click="showPendingNotice('개인정보처리방침')">
+          개인정보처리방침
+        </button>
         <span aria-hidden="true"></span>
         <button type="button" @click="showPendingNotice('이용약관')">이용약관</button>
       </nav>
@@ -149,15 +151,14 @@ function showPendingNotice(feature: string) {
 
 <style scoped>
 .login-page {
-  --navy: #1b3152;
   width: min(100%, var(--mobile-max-width));
   min-height: 100dvh;
   margin: 0 auto;
   padding: max(56px, 8vh) 18px 32px;
-  color: #222a35;
+  color: var(--color-text-base);
   background:
     radial-gradient(circle at 50% 53%, rgba(255, 255, 255, 0.92) 0 22%, transparent 48%),
-    #f7f8fd;
+    var(--color-bg);
 }
 
 .brand {
@@ -174,8 +175,8 @@ function showPendingNotice(feature: string) {
   margin-bottom: 27px;
   border-radius: 19px;
   place-items: center;
-  background: var(--navy);
-  box-shadow: 0 7px 18px rgba(23, 43, 73, 0.12);
+  background: var(--color-primary-container);
+  box-shadow: var(--shadow-md);
 }
 
 .brand-mark svg {
@@ -185,19 +186,19 @@ function showPendingNotice(feature: string) {
 
 .brand-mark path {
   fill: none;
-  stroke: #f9ead7;
+  stroke: var(--color-accent-pale);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 8;
 }
 
 .brand-mark circle {
-  fill: #e87505;
+  fill: var(--color-accent);
 }
 
 .brand h1 {
-  color: #092543;
-  font-family: Georgia, "Times New Roman", serif;
+  color: var(--color-primary-dark);
+  font-family: var(--font-serif);
   font-size: 36px;
   font-weight: 700;
   line-height: 1;
@@ -206,7 +207,7 @@ function showPendingNotice(feature: string) {
 
 .brand p {
   margin-top: 19px;
-  color: #5b5f64;
+  color: var(--color-on-surface-variant);
   font-size: 25px;
   font-style: italic;
   font-weight: 750;
@@ -216,10 +217,10 @@ function showPendingNotice(feature: string) {
 .login-card {
   margin-top: clamp(50px, 8vh, 72px);
   padding: 31px 30px 30px;
-  border: 1px solid #dcdee3;
+  border: 1px solid var(--color-outline-variant);
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 12px 30px rgba(35, 46, 70, 0.04);
+  box-shadow: var(--shadow-md);
 }
 
 .field-group + .field-group {
@@ -228,7 +229,7 @@ function showPendingNotice(feature: string) {
 
 label,
 .text-button {
-  color: #4e5155;
+  color: var(--color-on-surface-variant);
   font-size: 14px;
 }
 
@@ -240,22 +241,24 @@ label,
 }
 
 .text-button {
-  color: #8490ad;
+  color: var(--color-on-primary-container);
 }
 
 .input-wrap {
   display: flex;
   height: 56px;
   margin-top: 10px;
-  border: 1px solid #58616c;
+  border: 1px solid var(--color-outline);
   border-radius: 2px;
   align-items: center;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 
 .input-wrap:focus-within {
-  border-color: var(--navy);
-  box-shadow: 0 0 0 3px rgba(27, 49, 82, 0.1);
+  border-color: var(--color-primary-container);
+  box-shadow: 0 0 0 3px rgba(26, 43, 72, 0.1);
 }
 
 .input-wrap svg {
@@ -263,7 +266,7 @@ label,
   margin: 0 15px;
   flex: 0 0 auto;
   fill: none;
-  stroke: #777b82;
+  stroke: var(--color-text-subtle);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
@@ -275,25 +278,25 @@ label,
   padding-right: 12px;
   border: 0;
   outline: 0;
-  color: #10223d;
+  color: var(--color-primary-container);
   background: transparent;
   font-size: 17px;
 }
 
 .input-wrap input::placeholder {
-  color: #9aa3af;
+  color: var(--color-text-muted);
   opacity: 1;
 }
 
 .form-message {
   min-height: 18px;
   margin-top: 14px;
-  color: #66738a;
+  color: var(--color-on-surface-variant);
   font-size: 12px;
 }
 
 .form-message.error {
-  color: #c64242;
+  color: var(--color-error);
 }
 
 .login-button {
@@ -306,16 +309,18 @@ label,
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #fff;
-  background: var(--navy);
-  box-shadow: 0 2px 4px rgba(16, 31, 53, 0.18);
+  color: var(--color-on-primary);
+  background: var(--color-primary-container);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   font-size: 17px;
-  transition: background 0.2s, transform 0.1s;
+  transition:
+    background var(--transition),
+    transform var(--transition-fast);
 }
 
 .login-button:hover:not(:disabled) {
-  background: #254268;
+  background: var(--color-primary-gradient);
 }
 
 .login-button:active:not(:disabled) {
@@ -340,7 +345,7 @@ label,
   width: 21px;
   height: 21px;
   border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
+  border-top-color: var(--color-on-primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -351,13 +356,13 @@ label,
 }
 
 .login-footer p {
-  color: #686d73;
+  color: var(--color-on-surface-variant);
   font-size: 14px;
 }
 
 .login-footer p a {
   margin-left: 4px;
-  color: #122c50;
+  color: var(--color-primary-container);
   font-weight: 700;
   text-decoration: none;
 }
@@ -371,7 +376,7 @@ label,
 }
 
 .login-footer nav button {
-  color: #777b82;
+  color: var(--color-text-subtle);
   font-size: 12px;
 }
 
@@ -379,7 +384,7 @@ label,
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #c6c9d1;
+  background: var(--color-outline-variant);
 }
 
 .sr-only {
@@ -395,7 +400,9 @@ label,
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 360px) {
