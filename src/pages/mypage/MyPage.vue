@@ -79,9 +79,10 @@ async function loadTripDetails() {
       try {
         const detail = await tripApi.getDetail(trip.tripId)
         let thumb = detail.visitLogs.find((l) => l.photoUrl)?.photoUrl ?? null
-        if (!thumb && detail.visitLogs.length > 0) {
+        const firstLog = detail.visitLogs[0]
+        if (!thumb && firstLog) {
           try {
-            const h = await heritageApi.getDetail(detail.visitLogs[0].heritageId)
+            const h = await heritageApi.getDetail(firstLog.heritageId)
             thumb = h.thumbnailUrl ?? null
           } catch {}
         }
@@ -138,7 +139,11 @@ async function loadCategoryTotals() {
 }
 
 onMounted(async () => {
-  try { if (!userStore.user) await userStore.loadProfile() } catch { /* 조용히 실패 */ }
+  try {
+    if (!userStore.user) await userStore.loadProfile()
+  } catch {
+    /* 조용히 실패 */
+  }
   isLoading.value = true
   try {
     trips.value = await tripApi.list()
@@ -177,10 +182,7 @@ async function handleLogout() {
     />
 
     <template v-if="completedTrips.length > 0 || isLoading">
-      <MyPeriodChart
-        :periods="periodCounts"
-        :is-loading="isLoadingDetails || isLoadingPeriods"
-      />
+      <MyPeriodChart :periods="periodCounts" :is-loading="isLoadingDetails || isLoadingPeriods" />
       <MyCategoryProgress
         :items="categoryItems"
         :is-loading="isLoadingCategory || isLoadingPeriods"
@@ -323,7 +325,11 @@ async function handleLogout() {
 }
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 </style>
