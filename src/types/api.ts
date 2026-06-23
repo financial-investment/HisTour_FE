@@ -43,13 +43,17 @@ export interface TripResponse {
   status: 'IN_PROGRESS' | 'COMPLETED'
   visitCount: number
   createdAt: string
+  visitLogs?: VisitLogResponse[]
 }
 
 export interface VisitLogResponse {
   id: number
+  tripId: number
   heritageId: number
   heritageName: string
   photoUrl: string | null
+  lat: number
+  lng: number
   explanation: string | null
   visitedAt: string
 }
@@ -100,34 +104,35 @@ export interface ReportResponse {
 }
 
 export interface QuizChoiceResponse {
-  id: number
+  choiceId: number
   content: string
 }
 
 export interface QuizQuestionResponse {
-  quizSessionId: number
+  sessionId: number
   quizId: number
   sortOrder: number
   heritageId: number
   heritageName: string
   title: string
   content: string
+  source: string
+  difficulty: string
   choices: QuizChoiceResponse[]
 }
 
 export interface QuizSessionResponse {
   tripId: number
+  totalCount: number
   questions: QuizQuestionResponse[]
 }
 
 export interface QuizResultItemResponse {
-  quizSessionId: number
+  sessionId: number
   quizId: number
-  heritageName: string
-  content: string
   selectedChoiceId: number
-  isCorrect: boolean
-  correctAnswer: string
+  correctChoiceId: number
+  correct: boolean
   explanation: string | null
 }
 
@@ -140,5 +145,6 @@ export interface QuizResultResponse {
   tripId: number
   totalCount: number
   correctCount: number
+  accuracy: number
   results: QuizResultItemResponse[]
 }

@@ -14,11 +14,10 @@ export const quizApi = {
       .then((r) => r.data.data)
   },
 
-  submitAnswer(quizSessionId: number, selectedChoiceId: number) {
+  submitAnswers(answers: Array<{ sessionId: number; choiceId: number }>) {
     return apiClient
       .post<ApiResponse<QuizResultResponse>>('/api/quiz/results', {
-        quizSessionId,
-        selectedChoiceId,
+        answers,
       })
       .then((r) => r.data.data)
   },

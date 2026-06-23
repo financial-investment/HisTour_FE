@@ -36,6 +36,14 @@ const router = createRouter({
       ],
     },
     {
+      path: '/heritage/explanation',
+      component: () => import('@/pages/heritage/HeritageExplanationPage.vue'),
+    },
+    {
+      path: '/trip/:tripId/scan',
+      component: () => import('@/pages/heritage/HeritageScanPage.vue'),
+    },
+    {
       path: '/heritage/:heritageId',
       component: () => import('@/pages/heritage/HeritageDetailPage.vue'),
     },

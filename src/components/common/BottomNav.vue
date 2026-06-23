@@ -13,6 +13,7 @@ function isActive(path: string) {
   if (path === '/') return route.path === '/'
   return route.path.startsWith(path)
 }
+
 </script>
 
 <template>

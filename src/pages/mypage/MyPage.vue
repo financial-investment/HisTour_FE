@@ -29,6 +29,7 @@ const userStore = useUserStore()
 
 const trips = ref<TripResponse[]>([])
 const isLoading = ref(false)
+const isLoggingOut = ref(false)
 const tripDetailMap = ref<Record<number, { thumb: string | null; logs: VisitLogResponse[] }>>({})
 const isLoadingDetails = ref(false)
 const periodCounts = ref<{ label: string; count: number }[]>([])
@@ -146,9 +147,16 @@ onMounted(async () => {
   }
 })
 
-function handleLogout() {
-  userStore.logout()
-  router.push('/login')
+async function handleLogout() {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+
+  try {
+    await userStore.logout()
+  } finally {
+    await router.replace('/login')
+    isLoggingOut.value = false
+  }
 }
 </script>
 
@@ -160,6 +168,7 @@ function handleLogout() {
       :completed-count="completedTrips.length"
       :total-visits="totalVisits"
       :avg-visits="avgVisits"
+      :is-logging-out="isLoggingOut"
       @logout="handleLogout"
     />
 

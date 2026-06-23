@@ -5,6 +5,7 @@ defineProps<{
   completedCount: number
   totalVisits: number
   avgVisits: string
+  isLoggingOut?: boolean
 }>()
 
 defineEmits<{ logout: [] }>()
@@ -31,7 +32,12 @@ defineEmits<{ logout: [] }>()
         <h1 class="profile-name">{{ nickname }}</h1>
         <p class="profile-email">{{ email }}</p>
       </div>
-      <button class="logout-btn" aria-label="로그아웃" @click="$emit('logout')">
+      <button
+        class="logout-btn"
+        aria-label="로그아웃"
+        :disabled="isLoggingOut"
+        @click="$emit('logout')"
+      >
         <svg
           viewBox="0 0 20 20"
           fill="none"
@@ -135,6 +141,10 @@ defineEmits<{ logout: [] }>()
 .logout-btn:hover {
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
+}
+.logout-btn:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 .logout-btn svg {
   width: 18px;

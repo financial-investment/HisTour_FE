@@ -12,7 +12,9 @@ export const tripApi = {
   },
 
   create(payload: { title?: string; tripDate?: string }) {
-    return apiClient.post<ApiResponse<TripResponse>>('/api/trip', payload).then((r) => r.data.data)
+    return apiClient
+      .post<ApiResponse<number>>('/api/trip', payload)
+      .then((r) => r.data.data)
   },
 
   getDetail(tripId: number) {
@@ -23,7 +25,7 @@ export const tripApi = {
 
   complete(tripId: number) {
     return apiClient
-      .patch<ApiResponse<TripResponse>>(`/api/trip/${tripId}/complete`)
+      .patch<ApiResponse<void>>(`/api/trip/${tripId}/complete`)
       .then((r) => r.data.data)
   },
 
