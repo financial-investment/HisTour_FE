@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { reportApi } from '@/api/reportApi'
-import { loadQuizResult } from '@/utils/quizResultStorage'
+import { quizApi } from '@/api/quizApi'
 import type { CourseHeritage, QuizResultResponse, ReportResponse, VisitedHeritage } from '@/types/api'
 
 const route = useRoute()
@@ -59,7 +59,7 @@ async function loadReport() {
     isLoading.value = true
     errorMessage.value = ''
     report.value = await reportApi.get(tripId.value)
-    quizResult.value = loadQuizResult(tripId.value)
+    quizResult.value = await loadSubmittedQuizResult()
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '여행 리포트를 불러오지 못했습니다.')
   } finally {
@@ -83,6 +83,17 @@ function openHeritage(heritage: VisitedHeritage | CourseHeritage) {
   router.push(`/heritage/${heritage.heritageId}`)
 }
 
+async function loadSubmittedQuizResult() {
+  try {
+    return await quizApi.getResults(tripId.value)
+  } catch (error: unknown) {
+    if (getResponseStatus(error) === 404) {
+      return null
+    }
+    throw error
+  }
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (
     typeof error === 'object' &&
@@ -96,6 +107,20 @@ function getErrorMessage(error: unknown, fallback: string) {
     return data.message || fallback
   }
   return fallback
+}
+
+function getResponseStatus(error: unknown) {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof error.response === 'object' &&
+    error.response !== null &&
+    'status' in error.response
+  ) {
+    return error.response.status
+  }
+  return undefined
 }
 </script>
 

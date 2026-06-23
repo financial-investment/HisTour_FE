@@ -19,6 +19,12 @@ export const quizApi = {
       .then((r) => r.data.data)
   },
 
+  getResults(tripId: number) {
+    return apiClient
+      .get<ApiResponse<QuizResultResponse>>('/api/quiz/results', { params: { tripId } })
+      .then((r) => r.data.data)
+  },
+
   submitResults(answers: QuizAnswerSubmitRequest[]) {
     return apiClient
       .post<ApiResponse<QuizResultResponse>>('/api/quiz/results', {
