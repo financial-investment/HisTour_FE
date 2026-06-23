@@ -6,15 +6,15 @@
 
 ## 기술 스택
 
-| 분류 | 기술 |
-|---|---|
-| Framework | Vue 3 |
-| Language | TypeScript |
-| Build | Vite |
-| 상태 관리 | Pinia |
-| 라우터 | Vue Router 5 |
-| HTTP | Axios |
-| 코드 품질 | ESLint, Prettier, oxlint |
+| 분류      | 기술                     |
+| --------- | ------------------------ |
+| Framework | Vue 3 (Composition API)  |
+| Language  | TypeScript               |
+| Build     | Vite                     |
+| 상태 관리 | Pinia                    |
+| 라우터    | Vue Router               |
+| HTTP      | Axios                    |
+| 코드 품질 | ESLint, oxlint, Prettier |
 
 ---
 
@@ -23,34 +23,67 @@
 ```
 src/
 ├── api/
-│   └── apiClient.ts          # Axios 인스턴스 및 기본 설정
-├── assets/
-│   ├── fonts/                # 글꼴 파일
-│   ├── imgs/                 # 이미지 파일
-│   └── styles/               # 전역 스타일 (main.css)
+│   ├── apiClient.ts          # Axios 인스턴스 + JWT 인터셉터 (401 → refresh → retry)
+│   ├── heritageApi.ts        # 문화재 상세 / 해설 / 심화 해설 / 카테고리 통계
+│   ├── tripApi.ts            # 여행 목록·생성·상세·완료·추천
+│   ├── quizApi.ts            # 퀴즈 세션 생성·조회·답안 제출
+│   └── reportApi.ts          # 여행 리포트 조회
+├── assets/styles/
+│   └── main.css              # CSS 변수 디자인 토큰 전체 (색상·폰트·간격·그림자)
 ├── components/
-│   ├── common/               # 공통 UI 컴포넌트 (버튼, 모달 등)
-│   └── layouts/              # 레이아웃 컴포넌트
-├── config/
-│   └── index.ts              # 환경변수 및 상수 관리
+│   ├── common/
+│   │   ├── BottomNav.vue         # 하단 탭 내비 (홈 / 여행 / 마이페이지)
+│   │   ├── ImageCarousel.vue     # 가로 스와이프 캐러셀 (범용)
+│   │   ├── TripHistoryCard.vue   # 완료 여행 카드 (MainPage·MyPage 공용)
+│   │   ├── LoadingOverlay.vue    # 풀스크린 로딩 (AI 대기 UX)
+│   │   └── AppToast.vue          # 토스트 알림 (3초 자동 dismiss)
+│   └── layouts/
+│       └── AppLayout.vue         # BottomNav 포함 레이아웃 래퍼
+├── composables/
+│   ├── useToast.ts           # 전역 토스트 상태
+│   ├── useGeolocation.ts     # 현재 위치 조회
+│   └── useDeviceHeading.ts   # 디바이스 방위각
 ├── pages/
-│   ├── main/                 # 메인 (현장 해설)
-│   ├── trip/                 # 여행 기록
-│   ├── quiz/                 # 퀴즈
-│   ├── report/               # 여행 리포트
-│   ├── mypage/               # 마이페이지
-│   ├── LoadingPage.vue
-│   └── NotFoundPage.vue      # 404
+│   ├── auth/
+│   │   ├── LoginPage.vue
+│   │   └── RegisterPage.vue
+│   ├── main/
+│   │   ├── MainPage.vue
+│   │   └── components/
+│   │       ├── MainTopBar.vue          # 로고 + 로그아웃
+│   │       ├── MainWelcomeBanner.vue   # 웰컴 배너
+│   │       ├── MainActiveTripCard.vue  # 진행 중 여행 카드
+│   │       ├── MainNearbyList.vue      # 주변 문화재 추천 목록
+│   │       ├── MainStartCard.vue       # 새 여행 시작 유도 카드
+│   │       └── MainGuideCard.vue       # 서비스 사용 가이드
+│   ├── trip/
+│   │   └── TripPage.vue          # 카카오맵 + 카메라 FAB
+│   ├── heritage/
+│   │   ├── HeritageDetailPage.vue      # 문화재 상세 (풀스크린)
+│   │   ├── HeritageScanPage.vue        # 카메라 촬영
+│   │   └── HeritageExplanationPage.vue # AI 해설 결과
+│   ├── mypage/
+│   │   ├── MyPage.vue
+│   │   └── components/
+│   │       ├── MyProfileHeader.vue     # 프로필 헤더 + 통계
+│   │       ├── MyPeriodChart.vue       # 탐방 시대 도넛 차트
+│   │       ├── MyVisitGallery.vue      # 방문 문화재 캐러셀
+│   │       └── MyCategoryProgress.vue  # 카테고리별 달성률
+│   ├── quiz/
+│   │   └── QuizPage.vue
+│   ├── report/
+│   │   └── ReportPage.vue
+│   └── NotFoundPage.vue
 ├── router/
-│   ├── index.ts              # 라우터 생성 및 통합
-│   ├── tripRoutes.ts
-│   ├── quizRoutes.ts
-│   └── reportRoutes.ts
+│   └── index.ts              # 라우터 + 인증 가드
 ├── stores/
-│   └── userStore.ts          # 사용자 상태 관리
-├── utils/                    # 공통 유틸 함수
-├── App.vue
-└── main.ts
+│   ├── userStore.ts          # 인증 상태 (login/logout/fetchMe)
+│   └── journeyStore.ts       # 해설 결과 임시 상태
+├── types/
+│   └── api.ts                # BE 응답 타입 전체 정의
+└── utils/
+    ├── imageUtils.ts         # fileToBase64 (HEIC → JPEG 동적 변환)
+    └── kakaoMaps.ts          # 카카오맵 SDK 로더 (싱글턴)
 ```
 
 ---
@@ -60,8 +93,10 @@ src/
 `.env` 파일을 프로젝트 루트에 생성하세요.
 
 ```
-VITE_API_BASE_URL=http://localhost:8080
+VITE_KAKAO_MAP_APP_KEY=발급받은_JavaScript_키
 ```
+
+카카오 Developers → 내 애플리케이션 → 플랫폼 → Web에 `http://localhost:5173` 등록 필요.
 
 ---
 
@@ -77,9 +112,26 @@ npm run dev
 # 빌드
 npm run build
 
-# 코드 포맷 및 린트
+# 코드 포맷
 npm run format
-npm run lint
 ```
 
 개발 서버 기본 포트: `http://localhost:5173`
+
+---
+
+## 라우터 구조
+
+```
+/login                        → LoginPage (인증 불필요)
+/register                     → RegisterPage (인증 불필요)
+/ (AppLayout — BottomNav 포함)
+  ├── /                       → MainPage
+  ├── /trip                   → TripPage
+  └── /mypage                 → MyPage
+/heritage/explanation         → HeritageExplanationPage (풀스크린)
+/heritage/:heritageId         → HeritageDetailPage (풀스크린)
+/trip/:tripId/scan            → HeritageScanPage (풀스크린)
+/quiz/:tripId                 → QuizPage (풀스크린)
+/report/:tripId               → ReportPage (풀스크린)
+```
