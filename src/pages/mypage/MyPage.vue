@@ -3,13 +3,40 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { tripApi } from '@/api/tripApi'
-import type { TripResponse } from '@/types/api'
+import { heritageApi } from '@/api/heritageApi'
+import type { TripResponse, VisitLogResponse, HeritageCategoryStats } from '@/types/api'
+import MyProfileHeader from './components/MyProfileHeader.vue'
+import MyPeriodChart from './components/MyPeriodChart.vue'
+import MyVisitGallery from './components/MyVisitGallery.vue'
+import MyCategoryProgress from './components/MyCategoryProgress.vue'
+import TripHistoryCard from '@/components/common/TripHistoryCard.vue'
+
+const PERIOD_NAMES: Record<string, string> = {
+  PREHISTORIC: '선사시대',
+  GOJOSEON: '고조선',
+  THREE_KINGDOMS: '삼국시대',
+  UNIFIED: '통일신라',
+  GORYEO: '고려시대',
+  JOSEON: '조선시대',
+  OPENING: '개화기',
+  JAPANESE: '일제강점기',
+  MODERN: '근현대',
+  UNKNOWN: '미상',
+}
 
 const router = useRouter()
 const userStore = useUserStore()
+
 const trips = ref<TripResponse[]>([])
 const isLoading = ref(false)
 const isLoggingOut = ref(false)
+const tripDetailMap = ref<Record<number, { thumb: string | null; logs: VisitLogResponse[] }>>({})
+const isLoadingDetails = ref(false)
+const periodCounts = ref<{ label: string; count: number }[]>([])
+const isLoadingPeriods = ref(false)
+const categoryTotals = ref<HeritageCategoryStats[]>([])
+const visitedByCategory = ref<Record<string, number>>({})
+const isLoadingCategory = ref(false)
 
 const completedTrips = computed(() =>
   trips.value
@@ -19,24 +46,106 @@ const completedTrips = computed(() =>
 
 const totalVisits = computed(() => trips.value.reduce((sum, t) => sum + t.visitCount, 0))
 
-const hasActiveTrip = computed(() => trips.value.some((t) => t.status === 'IN_PROGRESS'))
+const avgVisits = computed(() => {
+  if (completedTrips.value.length === 0) return '0'
+  const total = completedTrips.value.reduce((sum, t) => sum + t.visitCount, 0)
+  return (total / completedTrips.value.length).toFixed(1)
+})
+
+const allVisitLogs = computed(() =>
+  completedTrips.value
+    .flatMap((t) => tripDetailMap.value[t.tripId]?.logs ?? [])
+    .sort((a, b) => new Date(b.visitedAt).getTime() - new Date(a.visitedAt).getTime()),
+)
+
+const categoryItems = computed(() =>
+  categoryTotals.value
+    .map((s) => ({
+      category: s.category,
+      visited: visitedByCategory.value[s.category] ?? 0,
+      total: s.total,
+    }))
+    .sort((a, b) => b.visited - a.visited || b.total - a.total)
+    .slice(0, 6),
+)
+
+async function loadTripDetails() {
+  if (completedTrips.value.length === 0) return
+  isLoadingDetails.value = true
+
+  const map: Record<number, { thumb: string | null; logs: VisitLogResponse[] }> = {}
+  await Promise.all(
+    completedTrips.value.map(async (trip) => {
+      try {
+        const detail = await tripApi.getDetail(trip.tripId)
+        map[trip.tripId] = {
+          thumb: detail.visitLogs.find((l) => l.photoUrl)?.photoUrl ?? null,
+          logs: detail.visitLogs,
+        }
+      } catch {
+        map[trip.tripId] = { thumb: null, logs: [] }
+      }
+    }),
+  )
+  tripDetailMap.value = map
+  isLoadingDetails.value = false
+
+  loadHeritageStats()
+}
+
+async function loadHeritageStats() {
+  const allLogs = completedTrips.value.flatMap((t) => tripDetailMap.value[t.tripId]?.logs ?? [])
+  const uniqueIds = [...new Set(allLogs.map((l) => l.heritageId))]
+  if (uniqueIds.length === 0) return
+
+  isLoadingPeriods.value = true
+  const periodCts: Record<string, number> = {}
+  const categoryCts: Record<string, number> = {}
+
+  await Promise.all(
+    uniqueIds.map(async (heritageId) => {
+      try {
+        const h = await heritageApi.getDetail(heritageId)
+        const period = h.period ?? 'UNKNOWN'
+        periodCts[period] = (periodCts[period] ?? 0) + 1
+        if (h.category) categoryCts[h.category] = (categoryCts[h.category] ?? 0) + 1
+      } catch {
+        // 조용히 실패
+      }
+    }),
+  )
+
+  periodCounts.value = Object.entries(periodCts)
+    .map(([period, count]) => ({ label: PERIOD_NAMES[period] ?? period, count }))
+    .sort((a, b) => b.count - a.count)
+  visitedByCategory.value = categoryCts
+  isLoadingPeriods.value = false
+}
+
+async function loadCategoryTotals() {
+  isLoadingCategory.value = true
+  try {
+    categoryTotals.value = await heritageApi.getCategoryStats()
+  } catch {
+    // 조용히 실패
+  } finally {
+    isLoadingCategory.value = false
+  }
+}
 
 onMounted(async () => {
-  if (!userStore.user) await userStore.loadProfile()
+  try { if (!userStore.user) await userStore.loadProfile() } catch { /* 조용히 실패 */ }
   isLoading.value = true
   try {
     trips.value = await tripApi.list()
+    loadTripDetails()
+    loadCategoryTotals()
   } catch {
     // 조용히 실패
   } finally {
     isLoading.value = false
   }
 })
-
-function formatDate(tripDate: string | null, createdAt: string) {
-  const raw = tripDate ?? createdAt
-  return raw.slice(0, 10).replace(/-/g, '.')
-}
 
 async function handleLogout() {
   if (isLoggingOut.value) return
@@ -53,66 +162,30 @@ async function handleLogout() {
 
 <template>
   <main class="mypage">
-    <!-- 프로필 헤더 -->
-    <section class="profile-header">
-      <div class="profile-top">
-        <div class="avatar" aria-hidden="true">
-          <svg
-            viewBox="0 0 40 40"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="20" cy="15" r="7" />
-            <path d="M6 36c0-7.7 6.3-12 14-12s14 4.3 14 12" />
-          </svg>
-        </div>
-        <div class="profile-info">
-          <p class="profile-sub">나의 역사 여행</p>
-          <h1 class="profile-name">{{ userStore.user?.nickname ?? '여행자' }}</h1>
-          <p class="profile-email">{{ userStore.user?.email }}</p>
-        </div>
-        <button
-          class="logout-btn"
-          aria-label="로그아웃"
-          :disabled="isLoggingOut"
-          @click="handleLogout"
-        >
-          <svg
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M13 15l4-5-4-5M17 10H7M7 3H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h3" />
-          </svg>
-        </button>
-      </div>
+    <MyProfileHeader
+      :nickname="userStore.user?.nickname ?? '여행자'"
+      :email="userStore.user?.email"
+      :completed-count="completedTrips.length"
+      :total-visits="totalVisits"
+      :avg-visits="avgVisits"
+      :is-logging-out="isLoggingOut"
+      @logout="handleLogout"
+    />
 
-      <!-- 통계 -->
-      <div class="stats-row">
-        <div class="stat-item">
-          <span class="stat-value">{{ completedTrips.length }}</span>
-          <span class="stat-label">완료 여행</span>
-        </div>
-        <div class="stat-divider" aria-hidden="true"></div>
-        <div class="stat-item">
-          <span class="stat-value">{{ totalVisits }}</span>
-          <span class="stat-label">방문 문화재</span>
-        </div>
-        <div class="stat-divider" aria-hidden="true"></div>
-        <div class="stat-item">
-          <span class="stat-value">{{ hasActiveTrip ? '진행 중' : '없음' }}</span>
-          <span class="stat-label">현재 여행</span>
-        </div>
-      </div>
-    </section>
+    <template v-if="completedTrips.length > 0 || isLoading">
+      <MyPeriodChart
+        :periods="periodCounts"
+        :is-loading="isLoadingDetails || isLoadingPeriods"
+      />
+      <MyCategoryProgress
+        :items="categoryItems"
+        :is-loading="isLoadingCategory || isLoadingPeriods"
+        class="section-gap"
+      />
+      <MyVisitGallery :logs="allVisitLogs" :is-loading="isLoadingDetails" />
+    </template>
 
-    <!-- 여행 기록 -->
+    <!-- 지난 여행 -->
     <section class="trips-section">
       <p class="section-label">
         <svg
@@ -127,86 +200,23 @@ async function handleLogout() {
           <rect x="1.5" y="2.5" width="11" height="10" rx="1.5" />
           <path d="M4 1.5v2M10 1.5v2M1.5 6h11" />
         </svg>
-        완료한 여행
+        지난 여행
       </p>
 
-      <!-- 로딩 스켈레톤 -->
       <template v-if="isLoading">
-        <div v-for="i in 3" :key="i" class="skeleton"></div>
+        <div v-for="i in 3" :key="i" class="trip-skeleton"></div>
       </template>
 
-      <!-- 여행 목록 -->
       <template v-else-if="completedTrips.length > 0">
-        <RouterLink
+        <TripHistoryCard
           v-for="trip in completedTrips"
           :key="trip.tripId"
-          :to="`/report/${trip.tripId}`"
-          class="trip-card"
-        >
-          <div class="trip-card-icon" aria-hidden="true">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M5 22h14M7 18h10M9 14V8h6v6M8 8h8L12 3 8 8Z" />
-              <path d="M11 11v3M13 11v3" />
-            </svg>
-          </div>
-          <div class="trip-card-body">
-            <h2 class="trip-title">{{ trip.title ?? '이름 없는 여행' }}</h2>
-            <div class="trip-meta">
-              <span>
-                <svg
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="1" y="1.5" width="10" height="9.5" rx="1.5" />
-                  <path d="M3.5 0.5v2M8.5 0.5v2M1 5h10" />
-                </svg>
-                {{ formatDate(trip.tripDate, trip.createdAt) }}
-              </span>
-              <span>
-                <svg
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <circle cx="6" cy="5" r="2" />
-                  <path d="M6 1a4 4 0 0 1 4 4c0 3-4 7-4 7S2 8 2 5a4 4 0 0 1 4-4z" />
-                </svg>
-                {{ trip.visitCount }}곳
-              </span>
-            </div>
-          </div>
-          <svg
-            class="trip-arrow"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M3 8h10M9 5l4 3-4 3" />
-          </svg>
-        </RouterLink>
+          :trip="trip"
+          :thumb="tripDetailMap[trip.tripId]?.thumb"
+          class="trip-card-gap"
+        />
       </template>
 
-      <!-- 빈 상태 -->
       <div v-else class="empty-state">
         <svg
           viewBox="0 0 48 48"
@@ -236,122 +246,10 @@ async function handleLogout() {
   background: var(--color-bg);
 }
 
-/* ── 프로필 헤더 ── */
-.profile-header {
-  background: linear-gradient(150deg, var(--color-primary) 0%, var(--color-primary-container) 100%);
-  color: var(--color-on-primary);
-  padding: 52px 24px 0;
+.section-gap {
+  margin-top: 24px;
 }
 
-.profile-top {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.avatar {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.75);
-}
-.avatar svg {
-  width: 32px;
-}
-
-.profile-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.profile-sub {
-  font-size: 11px;
-  color: var(--color-on-primary-container);
-  letter-spacing: 0.04em;
-}
-
-.profile-name {
-  margin-top: 3px;
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.profile-email {
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--color-on-primary-container);
-  opacity: 0.8;
-}
-
-.logout-btn {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  transition: background var(--transition);
-}
-.logout-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
-}
-.logout-btn:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
-.logout-btn svg {
-  width: 18px;
-}
-
-/* 통계 */
-.stats-row {
-  display: flex;
-  align-items: center;
-  margin-top: 28px;
-  padding: 18px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.stat-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.4px;
-}
-
-.stat-label {
-  font-size: 11px;
-  color: var(--color-on-primary-container);
-  opacity: 0.85;
-}
-
-.stat-divider {
-  width: 1px;
-  height: 30px;
-  background: rgba(255, 255, 255, 0.15);
-}
-
-/* ── 여행 기록 ── */
 .trips-section {
   padding: 24px 20px 0;
 }
@@ -368,79 +266,27 @@ async function handleLogout() {
   color: var(--color-outline);
 }
 .section-label svg {
-  width: 12px;
+  width: 13px;
 }
 
-/* 여행 카드 */
-.trip-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  margin-bottom: 8px;
-  border: 1px solid var(--color-outline-variant);
-  border-radius: 16px;
-  background: var(--color-surface-lowest);
-  text-decoration: none;
-  color: var(--color-on-surface);
-  transition: background var(--transition);
-}
-.trip-card:hover {
-  background: var(--color-surface-low);
+.trip-skeleton {
+  height: 120px;
+  margin-bottom: 10px;
+  border-radius: 18px;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-high) 25%,
+    var(--color-surface-highest) 50%,
+    var(--color-surface-high) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
 }
 
-.trip-card-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: var(--color-surface-high);
-  color: var(--color-primary-container);
-}
-.trip-card-icon svg {
-  width: 22px;
+.trip-card-gap {
+  margin-bottom: 10px;
 }
 
-.trip-card-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.trip-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-primary-container);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.trip-meta {
-  display: flex;
-  gap: 10px;
-  margin-top: 5px;
-  font-size: 11px;
-  color: var(--color-outline);
-}
-.trip-meta span {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-.trip-meta svg {
-  width: 11px;
-  flex-shrink: 0;
-}
-
-.trip-arrow {
-  flex-shrink: 0;
-  width: 15px;
-  color: var(--color-outline-variant);
-}
-
-/* 빈 상태 */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -472,27 +318,8 @@ async function handleLogout() {
   opacity: 0.85;
 }
 
-/* 스켈레톤 */
-.skeleton {
-  height: 72px;
-  margin-bottom: 8px;
-  border-radius: 16px;
-  background: linear-gradient(
-    90deg,
-    var(--color-surface-high) 25%,
-    var(--color-surface-highest) 50%,
-    var(--color-surface-high) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-}
-
 @keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 </style>

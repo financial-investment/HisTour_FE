@@ -1,7 +1,13 @@
 import apiClient from './apiClient'
-import type { ApiResponse, HeritageDetailResponse, ExplainResponse } from '@/types/api'
+import type { ApiResponse, HeritageDetailResponse, HeritageCategoryStats, ExplainResponse } from '@/types/api'
 
 export const heritageApi = {
+  getCategoryStats() {
+    return apiClient
+      .get<ApiResponse<HeritageCategoryStats[]>>('/api/heritage/stats/category')
+      .then((r) => r.data.data)
+  },
+
   getDetail(heritageId: number) {
     return apiClient
       .get<ApiResponse<HeritageDetailResponse>>(`/api/heritage/${heritageId}`)

@@ -5,6 +5,7 @@ import { useUserStore } from '@/stores/userStore'
 import { tripApi } from '@/api/tripApi'
 import { heritageApi } from '@/api/heritageApi'
 import type { TripResponse, RecommendedHeritage } from '@/types/api'
+import TripHistoryCard from '@/components/common/TripHistoryCard.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -21,13 +22,6 @@ const activeTrip = computed(() => trips.value.find((t) => t.status === 'IN_PROGR
 const latestCompletedTrip = computed(
   () => trips.value.find((t) => t.status === 'COMPLETED') ?? null,
 )
-const daysSinceLastTrip = computed(() => {
-  const last = latestCompletedTrip.value
-  if (!last) return null
-  const dateStr = last.tripDate ?? last.createdAt.slice(0, 10)
-  const diff = Date.now() - new Date(dateStr).getTime()
-  return Math.floor(diff / (1000 * 60 * 60 * 24))
-})
 
 async function loadNearby(tripId: number) {
   if (!navigator.geolocation) {
@@ -271,57 +265,12 @@ function formatDistance(m: number) {
       </p>
 
       <!-- 완료된 여행 있음 -->
-      <RouterLink
+      <TripHistoryCard
         v-if="latestCompletedTrip"
-        :to="`/report/${latestCompletedTrip.tripId}`"
-        class="recent-card"
-      >
-        <div class="recent-thumb-wrap">
-          <img
-            v-if="completedTripThumb"
-            :src="completedTripThumb"
-            :alt="latestCompletedTrip.title ?? '여행 대표 사진'"
-            class="recent-thumb"
-          />
-          <div v-else class="recent-thumb-placeholder" aria-hidden="true">
-            <svg viewBox="0 0 40 40">
-              <path d="M6 30h28M9 26h22M13 24V12h14v12M11 12h18L20 3 11 12Z" />
-              <path d="M16 15v7M20 15v7M24 15v7" />
-            </svg>
-          </div>
-          <span v-if="daysSinceLastTrip !== null" class="days-badge">
-            {{ daysSinceLastTrip }}일 전
-          </span>
-        </div>
-        <div class="recent-info">
-          <span class="recent-label">가장 최근 여행</span>
-          <h2 class="recent-title">{{ latestCompletedTrip.title ?? '이름 없는 여행' }}</h2>
-          <div class="recent-meta">
-            <span>
-              <svg viewBox="0 0 14 14" aria-hidden="true">
-                <rect x="1.5" y="2.5" width="11" height="10" rx="1.5" />
-                <path d="M4 1.5v2M10 1.5v2M1.5 6h11" />
-              </svg>
-              {{ formatDate(latestCompletedTrip.tripDate ?? latestCompletedTrip.createdAt) }}
-            </span>
-            <span>
-              <svg viewBox="0 0 14 14" aria-hidden="true">
-                <circle cx="7" cy="5.5" r="2.2" />
-                <path
-                  d="M7 1a4.5 4.5 0 0 1 4.5 4.5C11.5 9 7 13 7 13S2.5 9 2.5 5.5A4.5 4.5 0 0 1 7 1z"
-                />
-              </svg>
-              {{ latestCompletedTrip.visitCount }}곳 방문
-            </span>
-          </div>
-          <span class="recent-cta">
-            여행 리포트 보기
-            <svg viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M2 7h10M8 4l4 3-4 3" />
-            </svg>
-          </span>
-        </div>
-      </RouterLink>
+        :trip="latestCompletedTrip"
+        :thumb="completedTripThumb"
+        label="가장 최근 여행"
+      />
 
       <!-- 여행 목록 조회 실패 -->
       <div v-else-if="tripsError" class="error-card">
@@ -833,137 +782,6 @@ function formatDistance(m: number) {
 /* ── 여행 기록 섹션 ── */
 .record-section {
   margin-top: 28px;
-}
-
-/* 최근 완료 여행 카드 */
-.recent-card {
-  display: flex;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid var(--color-outline-variant);
-  border-radius: 18px;
-  background: var(--color-surface-lowest);
-  text-decoration: none;
-  color: var(--color-text-base);
-  transition: background var(--transition);
-}
-.recent-card:hover {
-  background: var(--color-surface-low);
-}
-
-.recent-thumb-wrap {
-  position: relative;
-  flex-shrink: 0;
-  width: 96px;
-  height: 96px;
-}
-
-.recent-thumb {
-  width: 100%;
-  height: 100%;
-  border-radius: 12px;
-  object-fit: cover;
-}
-
-.recent-thumb-placeholder {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  border-radius: 12px;
-  place-items: center;
-  background: linear-gradient(
-    140deg,
-    var(--color-surface-high) 0%,
-    var(--color-surface-highest) 100%
-  );
-}
-.recent-thumb-placeholder svg {
-  width: 36px;
-  fill: none;
-  stroke: var(--color-outline-variant);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 3;
-}
-
-.days-badge {
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  padding: 2px 8px;
-  border-radius: 20px;
-  background: var(--color-primary-container);
-  color: var(--color-on-primary);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.recent-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 0;
-}
-
-.recent-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--color-accent);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.recent-title {
-  margin-top: 5px;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--color-primary-container);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.recent-meta {
-  display: flex;
-  gap: 10px;
-  margin-top: 6px;
-  color: var(--color-text-muted);
-  font-size: 11px;
-}
-.recent-meta span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.recent-meta svg {
-  width: 11px;
-  flex-shrink: 0;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.5;
-}
-
-.recent-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 10px;
-  color: var(--color-accent);
-  font-size: 12px;
-  font-weight: 700;
-}
-.recent-cta svg {
-  width: 12px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
 }
 
 /* 서비스 가이드 */

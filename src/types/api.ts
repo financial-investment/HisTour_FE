@@ -136,6 +136,11 @@ export interface QuizResultItemResponse {
   explanation: string | null
 }
 
+export interface HeritageCategoryStats {
+  category: string
+  total: number
+}
+
 export interface QuizResultResponse {
   tripId: number
   totalCount: number
