@@ -55,6 +55,24 @@
   --color-on-error: #ffffff;
   --color-error-container: #ffdad6;
 
+  /* Colors — primary extended */
+  --color-primary-dark: #0c2949;
+  --color-primary-gradient: #24476c;
+
+  /* Colors — on primary (dark bg 위 텍스트) */
+  --color-on-primary-soft: #bfcce0;
+  --color-on-primary-meta: #a8bdd4;
+
+  /* Colors — surface warm (Heritage Gold 계열 카드) */
+  --color-surface-warm: #fffaf4;
+  --color-surface-warm-border: #eee1d4;
+  --color-accent-pale: #f9ead7;
+
+  /* Colors — text */
+  --color-text-base: #17263a;
+  --color-text-muted: #8d94a0;
+  --color-text-subtle: #6b7685;
+
   /* Colors — background */
   --color-bg: #f8f9ff;
   --color-on-bg: #121c28;
@@ -101,7 +119,7 @@
   /* Shadows (ambient, indigo-tinted) */
   --shadow-sm: 0 1px 3px rgba(26, 43, 72, 0.06);
   --shadow-md: 0 4px 12px rgba(26, 43, 72, 0.08);
-  --shadow-lg: 0 8px 24px rgba(26, 43, 72, 0.10);
+  --shadow-lg: 0 8px 24px rgba(26, 43, 72, 0.1);
 
   /* Transitions */
   --transition-fast: 120ms ease;
@@ -203,12 +221,24 @@ img {
 }
 
 /* ── Color utilities ───────────────────────────────── */
-.text-primary      { color: var(--color-primary); }
-.text-accent       { color: var(--color-accent); }
-.text-muted        { color: var(--color-on-surface-variant); }
-.text-on-primary   { color: var(--color-on-primary); }
-.bg-primary        { background-color: var(--color-primary); }
-.bg-surface        { background-color: var(--color-surface-lowest); }
+.text-primary {
+  color: var(--color-primary);
+}
+.text-accent {
+  color: var(--color-accent);
+}
+.text-muted {
+  color: var(--color-on-surface-variant);
+}
+.text-on-primary {
+  color: var(--color-on-primary);
+}
+.bg-primary {
+  background-color: var(--color-primary);
+}
+.bg-surface {
+  background-color: var(--color-surface-lowest);
+}
 
 /* ── Tag / Chip ────────────────────────────────────── */
 .chip {
