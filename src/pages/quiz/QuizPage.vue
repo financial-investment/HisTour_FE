@@ -154,10 +154,8 @@ async function restoreSubmittedResult() {
   let submittedResult: QuizResultResponse | null = null
   try {
     submittedResult = await quizApi.getResults(tripId.value)
-  } catch (error: unknown) {
-    if (getResponseStatus(error) !== 404) {
-      throw error
-    }
+  } catch {
+    return
   }
 
   if (!submittedResult) return
