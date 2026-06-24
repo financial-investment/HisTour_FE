@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { quizApi, type QuizAnswerSubmitRequest } from '@/api/quizApi'
 import { tripApi } from '@/api/tripApi'
-import { loadQuizResult, saveQuizResult } from '@/utils/quizResultStorage'
 import type {
   QuizChoiceResponse,
   QuizQuestionResponse,
@@ -102,7 +101,7 @@ async function loadQuiz() {
         throw error
       }
     }
-    restoreSavedResult()
+    await restoreSubmittedResult()
     currentIndex.value = 0
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '퀴즈를 준비하지 못했습니다.')
@@ -139,7 +138,6 @@ async function submitQuiz() {
     isSubmitting.value = true
     errorMessage.value = ''
     result.value = await quizApi.submitResults(answers)
-    saveQuizResult(result.value)
     openResultId.value = result.value.results[0]?.sessionId ?? null
     currentIndex.value = 0
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -150,25 +148,24 @@ async function submitQuiz() {
   }
 }
 
-function restartReview() {
-  currentIndex.value = 0
-  result.value = null
-  openResultId.value = null
-  selectedChoiceIds.value = {}
-}
-
-function restoreSavedResult() {
+async function restoreSubmittedResult() {
   if (!tripId.value) return
 
-  const savedResult = loadQuizResult(tripId.value)
-  if (!savedResult) return
+  let submittedResult: QuizResultResponse | null = null
+  try {
+    submittedResult = await quizApi.getResults(tripId.value)
+  } catch {
+    return
+  }
 
-  result.value = savedResult
-  selectedChoiceIds.value = savedResult.results.reduce<Record<number, number>>((answers, item) => {
+  if (!submittedResult) return
+
+  result.value = submittedResult
+  selectedChoiceIds.value = submittedResult.results.reduce<Record<number, number>>((answers, item) => {
     answers[item.sessionId] = item.selectedChoiceId
     return answers
   }, {})
-  openResultId.value = savedResult.results[0]?.sessionId ?? null
+  openResultId.value = submittedResult.results[0]?.sessionId ?? null
 }
 
 function getTripId(trip: TripLike) {
@@ -402,7 +399,6 @@ function getResponseStatus(error: unknown) {
 
       <div class="result-actions">
         <RouterLink to="/">Home</RouterLink>
-        <button type="button" @click="restartReview">다시 풀기</button>
       </div>
     </template>
 
