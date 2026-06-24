@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import type { VisitLogResponse } from '@/types/api'
+import { useHeritageThumbnails } from '@/composables/useHeritageThumbnails'
 import ImageCarousel from '@/components/common/ImageCarousel.vue'
 import type { CarouselItem } from '@/components/common/ImageCarousel.vue'
 
@@ -9,6 +10,8 @@ const props = defineProps<{
   isLoading: boolean
 }>()
 
+const { loadThumbnails, getThumbnail } = useHeritageThumbnails()
+
 const carouselItems = computed<CarouselItem[]>(() =>
   props.logs
     .filter((l) => l.photoUrl)
@@ -16,7 +19,16 @@ const carouselItems = computed<CarouselItem[]>(() =>
       url: l.photoUrl!,
       label: l.heritageName,
       linkTo: `/heritage/${l.heritageId}`,
+      fallbackUrl: getThumbnail(l.heritageId),
     })),
+)
+
+watch(
+  () => props.logs.map((log) => log.heritageId),
+  (ids) => {
+    loadThumbnails(ids)
+  },
+  { immediate: true },
 )
 </script>
 
@@ -39,9 +51,7 @@ const carouselItems = computed<CarouselItem[]>(() =>
       방문한 문화재
     </p>
 
-    <p v-if="!isLoading && carouselItems.length === 0" class="empty-sub">
-      촬영한 사진이 없어요.
-    </p>
+    <p v-if="!isLoading && carouselItems.length === 0" class="empty-sub">촬영한 사진이 없어요.</p>
 
     <ImageCarousel v-else :items="carouselItems" :is-loading="isLoading" />
   </section>

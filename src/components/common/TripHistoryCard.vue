@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { applyFallbackAsset, normalizeAssetUrl } from '@/utils/assetUrl'
 import type { TripResponse } from '@/types/api'
 
 const props = defineProps<{
   trip: TripResponse
   thumb?: string | null
+  fallbackThumb?: string | null
   label?: string
 }>()
 
@@ -21,7 +23,13 @@ function formatDate(tripDate: string | null, createdAt: string) {
 <template>
   <RouterLink :to="`/report/${trip.tripId}`" class="trip-history-card">
     <div class="thumb-wrap">
-      <img v-if="thumb" :src="thumb" :alt="trip.title ?? ''" class="thumb" />
+      <img
+        v-if="thumb"
+        :src="normalizeAssetUrl(thumb)"
+        :alt="trip.title ?? ''"
+        class="thumb"
+        @error="applyFallbackAsset($event, fallbackThumb)"
+      />
       <div v-else class="thumb-placeholder" aria-hidden="true">
         <svg
           viewBox="0 0 40 40"
@@ -68,7 +76,9 @@ function formatDate(tripDate: string | null, createdAt: string) {
             aria-hidden="true"
           >
             <circle cx="7" cy="5.5" r="2.2" />
-            <path d="M7 1a4.5 4.5 0 0 1 4.5 4.5C11.5 9 7 13 7 13S2.5 9 2.5 5.5A4.5 4.5 0 0 1 7 1z" />
+            <path
+              d="M7 1a4.5 4.5 0 0 1 4.5 4.5C11.5 9 7 13 7 13S2.5 9 2.5 5.5A4.5 4.5 0 0 1 7 1z"
+            />
           </svg>
           {{ trip.visitCount }}곳 방문
         </span>
@@ -127,7 +137,11 @@ function formatDate(tripDate: string | null, createdAt: string) {
   height: 100%;
   border-radius: 12px;
   place-items: center;
-  background: linear-gradient(140deg, var(--color-surface-high) 0%, var(--color-surface-highest) 100%);
+  background: linear-gradient(
+    140deg,
+    var(--color-surface-high) 0%,
+    var(--color-surface-highest) 100%
+  );
 }
 .thumb-placeholder svg {
   width: 36px;

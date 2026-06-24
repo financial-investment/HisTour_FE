@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { reportApi } from '@/api/reportApi'
 import { quizApi } from '@/api/quizApi'
+import { normalizeAssetUrl } from '@/utils/assetUrl'
 import { loadKakaoMaps, type KakaoMap, type KakaoMapsApi } from '@/utils/kakaoMaps'
 import type { CourseHeritage, QuizResultResponse, ReportResponse, VisitedHeritage } from '@/types/api'
 
@@ -260,7 +261,7 @@ onBeforeUnmount(() => {
         <div class="artifact-preview">
           <img
             v-if="visitedHeritages[0]?.thumbnailUrl"
-            :src="visitedHeritages[0].thumbnailUrl"
+            :src="normalizeAssetUrl(visitedHeritages[0].thumbnailUrl)"
             :alt="visitedHeritages[0].name"
           />
           <div v-else class="image-fallback">HisTour</div>
@@ -294,7 +295,7 @@ onBeforeUnmount(() => {
             @click="openHeritage(heritage)"
           >
             <div class="record-image">
-              <img v-if="heritage.thumbnailUrl" :src="heritage.thumbnailUrl" :alt="heritage.name" />
+              <img v-if="heritage.thumbnailUrl" :src="normalizeAssetUrl(heritage.thumbnailUrl)" :alt="heritage.name" />
               <span v-else>{{ getFallbackInitial(heritage.name) }}</span>
               <small>{{ getVisitedLabel(index) }}</small>
             </div>
