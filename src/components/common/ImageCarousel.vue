@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { normalizeAssetUrl } from '@/utils/assetUrl'
+import { applyFallbackAsset, normalizeAssetUrl } from '@/utils/assetUrl'
 
 export interface CarouselItem {
   url: string
   label?: string
   linkTo?: string
+  fallbackUrl?: string | null
 }
 
 const props = defineProps<{
@@ -38,7 +39,12 @@ const showDots = computed(() => props.items.length <= 10)
 
     <!-- 캐러셀 -->
     <template v-else-if="items.length > 0">
-      <div ref="carouselRef" class="carousel" :style="{ height: `${h}px` }" @scroll.passive="onScroll">
+      <div
+        ref="carouselRef"
+        class="carousel"
+        :style="{ height: `${h}px` }"
+        @scroll.passive="onScroll"
+      >
         <component
           :is="item.linkTo ? 'RouterLink' : 'div'"
           v-for="(item, i) in items"
@@ -46,7 +52,12 @@ const showDots = computed(() => props.items.length <= 10)
           :to="item.linkTo"
           class="slide"
         >
-          <img :src="normalizeAssetUrl(item.url)" :alt="item.label ?? '이미지'" class="slide-img" />
+          <img
+            :src="normalizeAssetUrl(item.url)"
+            :alt="item.label ?? '이미지'"
+            class="slide-img"
+            @error="applyFallbackAsset($event, item.fallbackUrl)"
+          />
           <div v-if="item.label" class="slide-overlay">
             <span class="slide-label">{{ item.label }}</span>
           </div>
@@ -159,7 +170,9 @@ const showDots = computed(() => props.items.length <= 10)
   background: var(--color-outline-variant);
   cursor: pointer;
   padding: 0;
-  transition: background 0.2s, transform 0.2s;
+  transition:
+    background 0.2s,
+    transform 0.2s;
 }
 .dot--active {
   background: var(--color-primary-container);
@@ -173,7 +186,11 @@ const showDots = computed(() => props.items.length <= 10)
 }
 
 @keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 </style>

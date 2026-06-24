@@ -15,3 +15,14 @@ export function normalizeAssetUrl(url: string | null | undefined): string {
 
   return url
 }
+
+export function applyFallbackAsset(event: Event, fallbackUrl: string | null | undefined) {
+  const img = event.target
+  if (!(img instanceof HTMLImageElement) || img.dataset.fallbackApplied) return
+
+  const nextUrl = normalizeAssetUrl(fallbackUrl)
+  if (!nextUrl || img.src === nextUrl) return
+
+  img.dataset.fallbackApplied = 'true'
+  img.src = nextUrl
+}

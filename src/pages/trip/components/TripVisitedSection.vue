@@ -1,11 +1,23 @@
 <script setup lang="ts">
+import { watch } from 'vue'
 import type { VisitLogResponse } from '@/types/api'
-import { normalizeAssetUrl } from '@/utils/assetUrl'
+import { useHeritageThumbnails } from '@/composables/useHeritageThumbnails'
+import { applyFallbackAsset, normalizeAssetUrl } from '@/utils/assetUrl'
 
-defineProps<{
+const props = defineProps<{
   logs: VisitLogResponse[]
   errorMessage: string
 }>()
+
+const { loadThumbnails, getThumbnail } = useHeritageThumbnails()
+
+watch(
+  () => props.logs.map((log) => log.heritageId),
+  (ids) => {
+    loadThumbnails(ids)
+  },
+  { immediate: true },
+)
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('ko-KR', {
@@ -27,7 +39,12 @@ function formatTime(value: string) {
     </div>
     <div v-if="logs.length" class="visit-list">
       <article v-for="log in logs" :key="log.id" class="visit-card">
-        <img v-if="log.photoUrl" :src="normalizeAssetUrl(log.photoUrl)" :alt="log.heritageName" />
+        <img
+          v-if="log.photoUrl"
+          :src="normalizeAssetUrl(log.photoUrl)"
+          :alt="log.heritageName"
+          @error="applyFallbackAsset($event, getThumbnail(log.heritageId))"
+        />
         <div v-else class="photo-placeholder" aria-hidden="true">🏛</div>
         <div>
           <strong>{{ log.heritageName }}</strong>
