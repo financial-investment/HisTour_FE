@@ -6,17 +6,23 @@ import { useJourneyStore } from '@/stores/journeyStore'
 
 const router = useRouter()
 const journeyStore = useJourneyStore()
-const selectedTopic = ref('숨겨진 이야기')
+type ExplainTopic = 'STORY' | 'PERSON' | 'ARCHITECTURE' | 'CONTEXT' | 'MODERN'
+
+const selectedTopic = ref<ExplainTopic>('STORY')
 const deepExplanation = ref('')
 const isLoadingDeep = ref(false)
 const errorMessage = ref('')
 const result = computed(() => journeyStore.explanation)
-const topics = [
-  { icon: '✦', label: '숨겨진 이야기', description: '잘 알려지지 않은 비화' },
-  { icon: '♙', label: '역사적 인물', description: '이곳을 거쳐간 사람들' },
-  { icon: '⌂', label: '건축과 상징', description: '공간에 담긴 의미' },
-  { icon: '⌛', label: '시대적 맥락', description: '당시 사회와 사건' },
+const topics: { value: ExplainTopic; icon: string; label: string; description: string }[] = [
+  { value: 'STORY', icon: '✦', label: '숨겨진 이야기', description: '잘 알려지지 않은 비화' },
+  { value: 'PERSON', icon: '♙', label: '역사적 인물', description: '이곳을 거쳐간 사람들' },
+  { value: 'ARCHITECTURE', icon: '⌂', label: '건축과 상징', description: '공간에 담긴 의미' },
+  { value: 'CONTEXT', icon: '⌛', label: '시대적 맥락', description: '당시 사회와 사건' },
+  { value: 'MODERN', icon: '◈', label: '현대적 영향', description: '오늘날에 남긴 의미' },
 ]
+const selectedTopicLabel = computed(
+  () => topics.find((topic) => topic.value === selectedTopic.value)?.label ?? '',
+)
 
 async function requestDeepExplanation() {
   if (!result.value?.visitLogId || isLoadingDeep.value) return
@@ -74,10 +80,10 @@ function returnToTrip() {
         <div class="topic-grid">
           <button
             v-for="topic in topics"
-            :key="topic.label"
+            :key="topic.value"
             type="button"
-            :class="{ selected: selectedTopic === topic.label }"
-            @click="selectedTopic = topic.label"
+            :class="{ selected: selectedTopic === topic.value }"
+            @click="selectedTopic = topic.value"
           >
             <span>{{ topic.icon }}</span>
             <strong>{{ topic.label }}</strong>
@@ -92,7 +98,7 @@ function returnToTrip() {
       </section>
 
       <article v-if="deepExplanation" class="deep-result">
-        <span>{{ selectedTopic }}</span>
+        <span>{{ selectedTopicLabel }}</span>
         <h2>기록 너머의 이야기</h2>
         <p>{{ deepExplanation }}</p>
       </article>
