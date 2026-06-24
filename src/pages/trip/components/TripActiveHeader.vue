@@ -27,7 +27,13 @@ function formatDate(value?: string | null) {
       <h1>{{ activeTrip.title || '나의 역사 여행' }}</h1>
       <span>{{ formatDate(activeTrip.tripDate) }} · 방문 {{ visitedCount }}곳</span>
     </div>
-    <button type="button" @click="$emit('complete')">End Trip</button>
+    <button
+      type="button"
+      aria-label="End trip"
+      @click="$emit('complete')"
+    >
+      End Trip
+    </button>
   </header>
 </template>
 

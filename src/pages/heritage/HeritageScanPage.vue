@@ -103,6 +103,15 @@ function setFocus(event: PointerEvent) {
   window.setTimeout(() => (focusPoint.value = null), 800)
 }
 
+async function closeScan() {
+  stopCamera()
+  if (window.history.state.back) {
+    router.back()
+    return
+  }
+  await router.push('/trip')
+}
+
 onBeforeUnmount(stopCamera)
 </script>
 
@@ -118,7 +127,7 @@ onBeforeUnmount(stopCamera)
     </div>
 
     <header>
-      <button type="button" aria-label="닫기" @click="router.back()">×</button>
+      <button type="button" aria-label="닫기" @click="closeScan">×</button>
       <div><i /><span>{{ scanMode === 'camera' ? 'LIVE VISION' : 'HERITAGE SCAN' }}</span></div>
       <button v-if="scanMode === 'camera'" type="button" aria-label="이미지 업로드" @click="openImageUpload">▧</button>
       <span v-else class="header-spacer" />
@@ -194,7 +203,7 @@ onBeforeUnmount(stopCamera)
 .scan-page { position: fixed; z-index: 1000; inset: 0; max-width: var(--mobile-max-width); margin: auto; overflow: hidden; color: white; background: #0a0d12; touch-action: manipulation; }
 .camera-feed, .camera-feed video, .camera-shade { position: absolute; inset: 0; width: 100%; height: 100%; }.camera-feed video { object-fit: cover; }.camera-shade { background: linear-gradient(180deg,rgba(0,0,0,.35),transparent 25%,transparent 70%,rgba(0,0,0,.65)); }
 .camera-fallback { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center; background: radial-gradient(circle at 50% 45%,#60533c,#1a1d21 65%); }.camera-fallback span { font-size: 64px; filter: grayscale(.4); }.camera-fallback p { color: rgba(255,255,255,.65); font-size: 12px; }
-header { position: absolute; z-index: 2; top: 0; left: 0; right: 0; padding: max(18px,env(safe-area-inset-top)) 17px 0; display: flex; align-items: center; justify-content: space-between; }
+header { position: absolute; z-index: 5; top: 0; left: 0; right: 0; padding: max(18px,env(safe-area-inset-top)) 17px 0; display: flex; align-items: center; justify-content: space-between; }
 header button, header > div, .side-control > span { border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.1); backdrop-filter: blur(12px); }
 header button { width: 46px; height: 46px; border-radius: 50%; color: white; font-size: 25px; } header > div { padding: 9px 13px; border-radius: 20px; display: flex; align-items: center; gap: 8px; } header i { width: 7px; height: 7px; border-radius: 50%; background: #ffd4b2; animation: pulse 1.4s infinite; } header span { font-size: 9px; font-weight: 700; letter-spacing: .15em; }
 .header-spacer { width: 46px; height: 46px; }
