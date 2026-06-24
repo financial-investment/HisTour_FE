@@ -26,9 +26,55 @@ let kakaoMaps: KakaoMapsApi | null = null
 let mapObjects: Array<{ setMap(map: KakaoMap | null): void }> = []
 let currentMarkerElement: HTMLElement | null = null
 
+const MIN_ROUTE_CURVE_OFFSET = 0.00035
+const ROUTE_CURVE_STEPS = 18
+
 function formatDistance(distanceM: number) {
   if (distanceM < 1000) return `${Math.round(distanceM)}m`
   return `${(distanceM / 1000).toFixed(1)}km`
+}
+
+function getSortedVisitLogs() {
+  return [...props.visitedLogs].sort(
+    (a, b) => new Date(a.visitedAt).getTime() - new Date(b.visitedAt).getTime(),
+  )
+}
+
+function getCurvedRoutePath(points: Array<{ lat: number; lng: number }>) {
+  if (points.length < 2 || !kakaoMaps) return []
+
+  const firstPoint = points[0]
+  if (!firstPoint) return []
+
+  const path = [new kakaoMaps.LatLng(firstPoint.lat, firstPoint.lng)]
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index]
+    const end = points[index + 1]
+    if (!start || !end) continue
+
+    const latDelta = end.lat - start.lat
+    const lngDelta = end.lng - start.lng
+    const distance = Math.hypot(latDelta, lngDelta)
+    if (distance === 0) continue
+
+    const direction = index % 2 === 0 ? 1 : -1
+    const offset = Math.max(distance * 0.18, MIN_ROUTE_CURVE_OFFSET)
+    const control = {
+      lat: (start.lat + end.lat) / 2 - (lngDelta / distance) * offset * direction,
+      lng: (start.lng + end.lng) / 2 + (latDelta / distance) * offset * direction,
+    }
+
+    for (let step = 1; step <= ROUTE_CURVE_STEPS; step += 1) {
+      const t = step / ROUTE_CURVE_STEPS
+      const inverse = 1 - t
+      const lat = inverse * inverse * start.lat + 2 * inverse * t * control.lat + t * t * end.lat
+      const lng = inverse * inverse * start.lng + 2 * inverse * t * control.lng + t * t * end.lng
+      path.push(new kakaoMaps!.LatLng(lat, lng))
+    }
+  }
+
+  return path
 }
 
 async function moveToCurrentLocation() {
@@ -72,7 +118,8 @@ async function renderMap() {
     currentOverlay.setMap(map)
     mapObjects.push(currentOverlay)
 
-    const routePoints = props.visitedLogs.map((log, index) => {
+    const sortedVisitLogs = getSortedVisitLogs()
+    const routePoints = sortedVisitLogs.map((log, index) => {
       const position = new kakaoMaps!.LatLng(log.lat, log.lng)
       const marker = document.createElement('div')
       marker.className = 'heritage-map-marker'
@@ -91,15 +138,28 @@ async function renderMap() {
     })
 
     if (routePoints.length > 1) {
-      const route = new kakaoMaps.Polyline({
-        path: routePoints,
-        strokeColor: '#1a365d',
-        strokeWeight: 4,
-        strokeOpacity: 0.8,
-        strokeStyle: 'solid',
-      })
-      route.setMap(map)
-      mapObjects.push(route)
+      const routePath = getCurvedRoutePath(sortedVisitLogs)
+      if (routePath.length > 1) {
+        const routeShadow = new kakaoMaps.Polyline({
+          path: routePath,
+          strokeColor: '#ffffff',
+          strokeWeight: 9,
+          strokeOpacity: 0.9,
+          strokeStyle: 'solid',
+        })
+        routeShadow.setMap(map)
+        mapObjects.push(routeShadow)
+
+        const route = new kakaoMaps.Polyline({
+          path: routePath,
+          strokeColor: '#1a365d',
+          strokeWeight: 4,
+          strokeOpacity: 0.88,
+          strokeStyle: 'shortdash',
+        })
+        route.setMap(map)
+        mapObjects.push(route)
+      }
     }
 
     props.recommendations.forEach((heritage) => {
