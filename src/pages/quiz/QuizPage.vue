@@ -282,28 +282,26 @@ function getResponseStatus(error: unknown) {
     </section>
 
     <template v-else-if="session && currentQuestion && !result">
-      <section class="question-head">
-        <div class="chips">
-          <span>{{ currentIndex + 1 }} / {{ totalCount }}</span>
+      <section class="question-panel">
+        <div class="question-meta">
+          <span>문제 {{ currentIndex + 1 }} / {{ totalCount }}</span>
           <span>{{ getDifficultyLabel(currentQuestion.difficulty) }}</span>
         </div>
 
-        <div class="artifact-badge">
-          <span>▥</span>
+        <div class="heritage-context">
+          <span>문화유산</span>
           <strong>{{ currentQuestion.heritageName }}</strong>
         </div>
 
         <h1>{{ currentQuestion.content }}</h1>
-      </section>
 
-      <section class="artifact-frame" aria-label="문제 관련 문화재">
-        <div>
-          <span>{{ currentQuestion.heritageName }}</span>
-          <strong>{{ currentQuestion.title }}</strong>
-        </div>
+        <p v-if="currentQuestion.source" class="source-note">
+          출처: {{ currentQuestion.source }}
+        </p>
       </section>
 
       <section class="choice-list">
+        <h2>답을 선택하세요</h2>
         <button
           v-for="choice in currentQuestion.choices"
           :key="choice.choiceId"
@@ -415,9 +413,9 @@ function getResponseStatus(error: unknown) {
 <style scoped>
 .quiz-page {
   min-height: 100dvh;
-  padding: 0 16px 112px;
-  color: #121c28;
-  background: #f8f9ff;
+  padding: 0 18px 112px;
+  color: #18212f;
+  background: #f5f7fb;
 }
 
 .quiz-page.result {
@@ -433,10 +431,11 @@ function getResponseStatus(error: unknown) {
   align-items: center;
   gap: 14px;
   height: 64px;
-  margin: 0 -16px;
-  padding: 0 16px;
-  border-bottom: 1px solid #c5c6ce;
-  background: #f8f9ff;
+  margin: 0 -18px;
+  padding: 0 18px;
+  border-bottom: 1px solid #d9dee8;
+  background: rgba(245, 247, 251, 0.96);
+  backdrop-filter: blur(14px);
 }
 
 .quiz-header button,
@@ -468,9 +467,11 @@ function getResponseStatus(error: unknown) {
 .session-meter i {
   display: block;
   width: 96px;
-  height: 4px;
+  height: 5px;
   margin-top: 5px;
-  background: #d9e3f4;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #dce4f0;
 }
 
 .session-meter b {
@@ -480,7 +481,6 @@ function getResponseStatus(error: unknown) {
 }
 
 .quiz-index,
-.question-head,
 .score-section {
   padding-top: 44px;
   text-align: center;
@@ -496,7 +496,6 @@ function getResponseStatus(error: unknown) {
 }
 
 .index-title h1,
-.question-head h1,
 .score-section h1 {
   color: #031632;
   font-family: Georgia, "Times New Roman", serif;
@@ -524,12 +523,13 @@ function getResponseStatus(error: unknown) {
 
 .trip-card,
 .message-panel,
+.question-panel,
 .choice-button,
 .review-card {
-  border: 1px solid #c5c6ce;
+  border: 1px solid #d5dbe6;
   border-radius: 4px;
   background: #ffffff;
-  box-shadow: 0 4px 12px rgba(26, 43, 72, 0.06);
+  box-shadow: 0 8px 20px rgba(26, 43, 72, 0.07);
 }
 
 .trip-card {
@@ -593,123 +593,117 @@ function getResponseStatus(error: unknown) {
   text-decoration: none;
 }
 
-.chips {
+.question-panel {
+  margin-top: 22px;
+  padding: 20px 18px 18px;
+}
+
+.question-meta {
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 18px;
 }
 
-.chips span {
-  padding: 7px 16px;
-  border: 1px solid #c5c6ce;
+.question-meta span {
+  min-height: 30px;
+  padding: 7px 12px;
+  border: 1px solid #d7deea;
   border-radius: 999px;
-  color: #031632;
-  background: #dfe9fa;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.chips span:first-child {
-  color: #ffffff;
-  background: #031632;
-}
-
-.artifact-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 28px;
-  padding: 12px 18px;
-  border: 1px solid #c5c6ce;
-  border-radius: 4px;
-  background: #ffffff;
-  box-shadow: 0 4px 12px rgba(26, 43, 72, 0.06);
-}
-
-.artifact-badge strong {
-  color: #031632;
-  font-size: 16px;
-}
-
-.question-head h1 {
-  font-size: 34px;
-}
-
-.artifact-frame {
-  display: grid;
-  height: 210px;
-  margin-top: 42px;
-  border: 1px solid #c5c6ce;
-  border-radius: 4px;
-  place-items: center;
-  padding: 16px;
-  overflow: hidden;
-  background:
-    linear-gradient(140deg, rgba(3, 22, 50, 0.16), transparent 38%),
-    linear-gradient(25deg, transparent 45%, rgba(217, 119, 6, 0.2) 45% 48%, transparent 48%),
-    #eef4ff;
-}
-
-.artifact-frame div {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  border: 1px solid rgba(3, 22, 50, 0.12);
-  place-items: center;
-  align-content: center;
-  background: rgba(255, 255, 255, 0.72);
-  text-align: center;
-}
-
-.artifact-frame span {
-  color: #d97706;
+  color: #344155;
+  background: #f4f7fc;
   font-size: 12px;
   font-weight: 900;
 }
 
-.artifact-frame strong {
-  margin-top: 10px;
+.question-meta span:first-child {
+  color: #ffffff;
+  background: #031632;
+  border-color: #031632;
+}
+
+.heritage-context {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0f5;
+}
+
+.heritage-context span {
+  color: #8a4b10;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.heritage-context strong {
+  color: #344155;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.question-panel h1 {
+  margin-top: 14px;
   color: #031632;
-  font-size: 20px;
+  font-family: var(--font-serif);
+  font-size: clamp(25px, 7.5vw, 31px);
+  line-height: 1.32;
+  letter-spacing: 0;
+  word-break: keep-all;
+}
+
+.source-note {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #edf0f5;
+  color: #697386;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .choice-list {
   display: grid;
-  gap: 16px;
-  margin-top: 58px;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.choice-list h2 {
+  color: #4b5567;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .choice-button {
   display: grid;
-  grid-template-columns: 40px 1fr;
-  gap: 16px;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
   align-items: center;
-  min-height: 104px;
-  padding: 22px 24px;
+  min-height: 72px;
+  padding: 16px 18px;
   color: #121c28;
   text-align: left;
 }
 
 .choice-button i {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border: 2px solid #75777e;
   border-radius: 999px;
 }
 
 .choice-button span {
-  font-size: 18px;
-  line-height: 1.5;
+  font-size: 16px;
+  line-height: 1.45;
 }
 
 .choice-button.selected {
-  border-color: #031632;
-  background: #e5eeff;
+  border-color: #1d4f91;
+  background: #eaf2ff;
 }
 
 .choice-button.selected i {
-  border: 8px solid #031632;
+  border: 7px solid #1d4f91;
 }
 
 .quiz-actions {
@@ -723,7 +717,7 @@ function getResponseStatus(error: unknown) {
   width: min(100%, var(--mobile-max-width));
   margin: 0 auto;
   padding: 16px;
-  border-top: 1px solid #c5c6ce;
+  border-top: 1px solid #d9dee8;
   background: #ffffff;
 }
 
