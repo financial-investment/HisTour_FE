@@ -53,7 +53,7 @@ watch(
 
     <p v-if="!isLoading && carouselItems.length === 0" class="empty-sub">촬영한 사진이 없어요.</p>
 
-    <ImageCarousel v-else :items="carouselItems" :is-loading="isLoading" />
+    <ImageCarousel v-else :items="carouselItems" :is-loading="isLoading" show-controls />
   </section>
 </template>
 

@@ -283,7 +283,6 @@ onBeforeUnmount(() => {
             <h2>Archived Records</h2>
             <p>VERIFIED LOCATIONS VISITED</p>
           </div>
-          <RouterLink to="/trip">VIEW ALL →</RouterLink>
         </div>
 
         <div v-if="visitedHeritages.length" class="record-scroll">
@@ -598,25 +597,24 @@ onBeforeUnmount(() => {
   margin-bottom: 22px;
 }
 
-.section-heading a {
-  color: #031632;
-  font-size: 12px;
-  font-weight: 800;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
 .record-scroll {
   display: flex;
   gap: 16px;
   margin: 0 -16px;
   overflow-x: auto;
-  padding: 0 16px 8px;
-  scrollbar-width: none;
+  padding: 0 16px 12px;
+  scrollbar-color: #c5c6ce transparent;
+  scrollbar-width: thin;
+  scroll-snap-type: x mandatory;
 }
 
 .record-scroll::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+
+.record-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #c5c6ce;
 }
 
 .record-card {
@@ -624,6 +622,7 @@ onBeforeUnmount(() => {
   padding: 12px;
   color: inherit;
   text-align: left;
+  scroll-snap-align: start;
 }
 
 .record-image {
