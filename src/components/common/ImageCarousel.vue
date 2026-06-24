@@ -13,6 +13,7 @@ const props = defineProps<{
   items: CarouselItem[]
   height?: number
   isLoading?: boolean
+  showControls?: boolean
 }>()
 
 const h = computed(() => props.height ?? 220)
@@ -27,6 +28,12 @@ function onScroll() {
 function goTo(index: number) {
   if (!carouselRef.value) return
   carouselRef.value.scrollTo({ left: index * carouselRef.value.clientWidth, behavior: 'smooth' })
+}
+
+function moveBy(direction: -1 | 1) {
+  const maxIndex = props.items.length - 1
+  const nextIndex = Math.min(Math.max(currentIndex.value + direction, 0), maxIndex)
+  goTo(nextIndex)
 }
 
 const showDots = computed(() => props.items.length <= 10)
@@ -64,6 +71,47 @@ const showDots = computed(() => props.items.length <= 10)
         </component>
       </div>
 
+      <template v-if="showControls && items.length > 1">
+        <button
+          type="button"
+          class="carousel-control carousel-control--prev"
+          :disabled="currentIndex === 0"
+          aria-label="Previous image"
+          @click="moveBy(-1)"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M10 3 5 8l5 5" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="carousel-control carousel-control--next"
+          :disabled="currentIndex === items.length - 1"
+          aria-label="Next image"
+          @click="moveBy(1)"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 3 5 5-5 5" />
+          </svg>
+        </button>
+      </template>
+
       <!-- 인디케이터 -->
       <div class="indicator">
         <template v-if="showDots">
@@ -84,6 +132,7 @@ const showDots = computed(() => props.items.length <= 10)
 
 <style scoped>
 .carousel-wrap {
+  position: relative;
   width: 100%;
 }
 
@@ -151,6 +200,46 @@ const showDots = computed(() => props.items.length <= 10)
   color: #fff;
   letter-spacing: -0.3px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.carousel-control {
+  position: absolute;
+  top: calc(50% - 13px);
+  z-index: 2;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+  place-items: center;
+  color: #fff;
+  background: rgba(3, 22, 50, 0.7);
+  box-shadow: 0 4px 12px rgba(3, 22, 50, 0.2);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.carousel-control:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.carousel-control:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.carousel-control svg {
+  width: 17px;
+  height: 17px;
+}
+
+.carousel-control--prev {
+  left: 10px;
+}
+
+.carousel-control--next {
+  right: 10px;
 }
 
 .indicator {
