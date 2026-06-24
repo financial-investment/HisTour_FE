@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { reportApi } from '@/api/reportApi'
 import { quizApi } from '@/api/quizApi'
+import { loadKakaoMaps, type KakaoMap, type KakaoMapsApi } from '@/utils/kakaoMaps'
 import type { CourseHeritage, QuizResultResponse, ReportResponse, VisitedHeritage } from '@/types/api'
 
 const route = useRoute()
@@ -13,10 +14,17 @@ const report = ref<ReportResponse | null>(null)
 const quizResult = ref<QuizResultResponse | null>(null)
 const isLoading = ref(true)
 const errorMessage = ref('')
+const courseMapElement = ref<HTMLElement | null>(null)
+const courseMapErrorMessage = ref('')
 
 const tripId = computed(() => Number(route.params.tripId))
 const visitedHeritages = computed(() => report.value?.visitedHeritages ?? [])
 const courseHeritages = computed(() => report.value?.course?.heritages ?? [])
+const validCourseHeritages = computed(() =>
+  [...courseHeritages.value]
+    .filter((heritage) => Number.isFinite(heritage.lat) && Number.isFinite(heritage.lng))
+    .sort((a, b) => a.order - b.order),
+)
 const summaryParagraphs = computed(() => {
   const summary = report.value?.summary?.trim()
   if (!summary) return ['이번 여행의 방문 기록을 바탕으로 역사적 흐름을 정리했습니다.']
@@ -45,6 +53,10 @@ const quizResultMessage = computed(() => {
   if (accuracy >= 50) return 'Good review checkpoint'
   return 'Review recommended'
 })
+
+let courseMap: KakaoMap | null = null
+let kakaoMaps: KakaoMapsApi | null = null
+let courseMapObjects: Array<{ setMap(map: KakaoMap | null): void }> = []
 
 onMounted(loadReport)
 
@@ -83,6 +95,105 @@ function openHeritage(heritage: VisitedHeritage | CourseHeritage) {
   router.push(`/heritage/${heritage.heritageId}`)
 }
 
+function clearCourseMap() {
+  courseMapObjects.forEach((object) => object.setMap(null))
+  courseMapObjects = []
+  courseMap = null
+}
+
+async function renderCourseMap() {
+  if (!courseMapElement.value) return
+
+  clearCourseMap()
+  courseMapErrorMessage.value = ''
+
+  if (!validCourseHeritages.value.length) {
+    courseMapElement.value.replaceChildren()
+    return
+  }
+
+  try {
+    kakaoMaps = await loadKakaoMaps()
+    courseMapElement.value.replaceChildren()
+
+    const center = getCourseCenter(validCourseHeritages.value)
+    courseMap = new kakaoMaps.Map(courseMapElement.value, {
+      center: new kakaoMaps.LatLng(center.lat, center.lng),
+      level: 6,
+    })
+
+    const bounds = new kakaoMaps.LatLngBounds()
+    const path = validCourseHeritages.value.map((heritage, index) => {
+      const position = new kakaoMaps!.LatLng(heritage.lat, heritage.lng)
+      bounds.extend(position)
+
+      const marker = document.createElement('button')
+      marker.type = 'button'
+      marker.className = 'report-course-marker'
+      marker.title = heritage.name
+      marker.setAttribute('aria-label', `${index + 1}번째 추천 코스, ${heritage.name}`)
+      marker.innerHTML = `<span>${index + 1}</span>`
+      marker.addEventListener('click', () => openHeritage(heritage))
+
+      const overlay = new kakaoMaps!.CustomOverlay({
+        position,
+        content: marker,
+        xAnchor: 0.5,
+        yAnchor: 1,
+        zIndex: 3,
+      })
+      overlay.setMap(courseMap)
+      courseMapObjects.push(overlay)
+
+      return position
+    })
+
+    if (path.length > 1) {
+      const routeShadow = new kakaoMaps.Polyline({
+        path,
+        strokeColor: '#ffffff',
+        strokeWeight: 8,
+        strokeOpacity: 0.92,
+        strokeStyle: 'solid',
+      })
+      routeShadow.setMap(courseMap)
+      courseMapObjects.push(routeShadow)
+
+      const route = new kakaoMaps.Polyline({
+        path,
+        strokeColor: '#d97706',
+        strokeWeight: 4,
+        strokeOpacity: 0.9,
+        strokeStyle: 'solid',
+      })
+      route.setMap(courseMap)
+      courseMapObjects.push(route)
+    }
+
+    courseMap.relayout()
+    courseMap.setBounds(bounds)
+  } catch {
+    courseMapErrorMessage.value = import.meta.env.VITE_KAKAO_MAP_APP_KEY
+      ? '카카오 지도를 불러오지 못했어요. 허용 도메인 설정을 확인해 주세요.'
+      : '카카오 지도 JavaScript 키 설정이 필요해요.'
+  }
+}
+
+function getCourseCenter(heritages: CourseHeritage[]) {
+  const total = heritages.reduce(
+    (acc, heritage) => ({
+      lat: acc.lat + heritage.lat,
+      lng: acc.lng + heritage.lng,
+    }),
+    { lat: 0, lng: 0 },
+  )
+
+  return {
+    lat: total.lat / heritages.length,
+    lng: total.lng / heritages.length,
+  }
+}
+
 async function loadSubmittedQuizResult() {
   try {
     return await quizApi.getResults(tripId.value)
@@ -105,6 +216,14 @@ function getErrorMessage(error: unknown, fallback: string) {
   }
   return fallback
 }
+
+watch(validCourseHeritages, () => {
+  nextTick(renderCourseMap)
+})
+
+onBeforeUnmount(() => {
+  clearCourseMap()
+})
 </script>
 
 <template>
@@ -191,17 +310,15 @@ function getErrorMessage(error: unknown, fallback: string) {
       </section>
 
       <section class="course-section">
-        <div class="course-map">
-          <div
-            v-for="(heritage, index) in courseHeritages.slice(0, 3)"
-            :key="heritage.heritageId"
-            class="map-pin"
-            :style="{
-              left: `${24 + index * 24}%`,
-              top: `${28 + (index % 2) * 24}%`,
-            }"
-          >
-            {{ index + 1 }}
+        <div class="course-map" :class="{ 'is-empty': !validCourseHeritages.length }">
+          <div ref="courseMapElement" class="course-map-canvas" aria-label="추천 코스 지도"></div>
+          <div v-if="courseMapErrorMessage" class="course-map-error" role="alert">
+            <strong>지도를 표시할 수 없어요</strong>
+            <span>{{ courseMapErrorMessage }}</span>
+          </div>
+          <div v-else-if="!validCourseHeritages.length" class="course-map-empty">
+            <strong>추천 코스 좌표가 없어요</strong>
+            <span>코스가 준비되면 지도에 순서대로 표시됩니다.</span>
           </div>
         </div>
 
@@ -572,24 +689,48 @@ function getErrorMessage(error: unknown, fallback: string) {
   position: relative;
   height: 280px;
   overflow: hidden;
+  background: #d9e3f4;
+}
+
+.course-map-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.course-map.is-empty .course-map-canvas {
+  opacity: 0;
+}
+
+.course-map-error,
+.course-map-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 28px;
+  place-items: center;
+  text-align: center;
   background:
     linear-gradient(135deg, rgba(3, 22, 50, 0.08) 25%, transparent 25%) 0 0 / 42px 42px,
-    linear-gradient(45deg, transparent 48%, rgba(3, 22, 50, 0.28) 48% 51%, transparent 51%),
+    linear-gradient(45deg, transparent 48%, rgba(3, 22, 50, 0.24) 48% 51%, transparent 51%),
     #d9e3f4;
 }
 
-.map-pin {
-  position: absolute;
-  display: grid;
-  width: 34px;
-  height: 34px;
-  border: 3px solid #fff;
-  border-radius: 50%;
-  place-items: center;
-  color: #fff;
-  background: #031632;
-  font-weight: 900;
-  box-shadow: 0 6px 16px rgba(3, 22, 50, 0.22);
+.course-map-error strong,
+.course-map-empty strong {
+  color: #031632;
+  font-size: 17px;
+}
+
+.course-map-error span,
+.course-map-empty span {
+  max-width: 260px;
+  margin-top: 6px;
+  color: #5c5f60;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .course-copy {
@@ -640,6 +781,30 @@ function getErrorMessage(error: unknown, fallback: string) {
   color: #5c5f60;
   font-size: 13px;
   line-height: 1.45;
+}
+
+:global(.report-course-marker) {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50% 50% 50% 5px;
+  place-items: center;
+  color: #fff;
+  background: #031632;
+  box-shadow: 0 6px 16px rgba(3, 22, 50, 0.28);
+  cursor: pointer;
+  transform: rotate(-45deg);
+}
+
+:global(.report-course-marker span) {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+  transform: rotate(45deg);
 }
 
 .quiz-cta {

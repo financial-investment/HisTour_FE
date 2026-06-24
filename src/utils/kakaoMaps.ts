@@ -3,9 +3,15 @@ export interface KakaoLatLng {
   getLng(): number
 }
 
+export interface KakaoLatLngBounds {
+  extend(position: KakaoLatLng): void
+}
+
 export interface KakaoMap {
   getLevel(): number
   panTo(position: KakaoLatLng): void
+  relayout(): void
+  setBounds(bounds: KakaoLatLngBounds): void
   setLevel(level: number, options?: { anchor?: KakaoLatLng; animate?: boolean }): void
 }
 
@@ -33,6 +39,7 @@ interface KakaoPolylineOptions {
 export interface KakaoMapsApi {
   load(callback: () => void): void
   LatLng: new (lat: number, lng: number) => KakaoLatLng
+  LatLngBounds: new () => KakaoLatLngBounds
   Map: new (container: HTMLElement, options: KakaoMapOptions) => KakaoMap
   CustomOverlay: new (options: KakaoCustomOverlayOptions) => { setMap(map: KakaoMap | null): void }
   Polyline: new (options: KakaoPolylineOptions) => { setMap(map: KakaoMap | null): void }
