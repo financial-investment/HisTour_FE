@@ -30,7 +30,9 @@ const userStore = useUserStore()
 const trips = ref<TripResponse[]>([])
 const isLoading = ref(false)
 const isLoggingOut = ref(false)
-const tripDetailMap = ref<Record<number, { thumb: string | null; logs: VisitLogResponse[] }>>({})
+const tripDetailMap = ref<
+  Record<number, { thumb: string | null; fallbackThumb: string | null; logs: VisitLogResponse[] }>
+>({})
 const isLoadingDetails = ref(false)
 const periodCounts = ref<{ label: string; count: number }[]>([])
 const isLoadingPeriods = ref(false)
@@ -73,22 +75,27 @@ async function loadTripDetails() {
   if (trips.value.length === 0) return
   isLoadingDetails.value = true
 
-  const map: Record<number, { thumb: string | null; logs: VisitLogResponse[] }> = {}
+  const map: Record<
+    number,
+    { thumb: string | null; fallbackThumb: string | null; logs: VisitLogResponse[] }
+  > = {}
   await Promise.all(
     trips.value.map(async (trip) => {
       try {
         const detail = await tripApi.getDetail(trip.tripId)
         let thumb = detail.visitLogs.find((l) => l.photoUrl)?.photoUrl ?? null
+        let fallbackThumb: string | null = null
         const firstLog = detail.visitLogs[0]
-        if (!thumb && firstLog) {
+        if (firstLog) {
           try {
             const h = await heritageApi.getDetail(firstLog.heritageId)
-            thumb = h.thumbnailUrl ?? null
+            fallbackThumb = h.thumbnailUrl ?? null
+            if (!thumb) thumb = fallbackThumb
           } catch {}
         }
-        map[trip.tripId] = { thumb, logs: detail.visitLogs }
+        map[trip.tripId] = { thumb, fallbackThumb, logs: detail.visitLogs }
       } catch {
-        map[trip.tripId] = { thumb: null, logs: [] }
+        map[trip.tripId] = { thumb: null, fallbackThumb: null, logs: [] }
       }
     }),
   )
@@ -219,6 +226,7 @@ async function handleLogout() {
           :key="trip.tripId"
           :trip="trip"
           :thumb="tripDetailMap[trip.tripId]?.thumb"
+          :fallback-thumb="tripDetailMap[trip.tripId]?.fallbackThumb"
           class="trip-card-gap"
         />
       </template>

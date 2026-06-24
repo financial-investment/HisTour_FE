@@ -21,6 +21,7 @@ const nearbyHeritages = ref<RecommendedHeritage[]>([])
 const isLoadingNearby = ref(false)
 const nearbyError = ref<'geo' | 'empty' | null>(null)
 const completedTripThumb = ref<string | null>(null)
+const completedTripFallbackThumb = ref<string | null>(null)
 const tripsError = ref(false)
 
 const activeTrip = computed(() => trips.value.find((t) => t.status === 'IN_PROGRESS') ?? null)
@@ -60,11 +61,12 @@ async function loadCompletedTripThumb(tripId: number) {
     const detail = await tripApi.getDetail(tripId)
     const firstLog = detail.visitLogs[0]
     if (!firstLog) return
+    const heritage = await heritageApi.getDetail(firstLog.heritageId)
+    completedTripFallbackThumb.value = heritage.thumbnailUrl
     if (firstLog.photoUrl) {
       completedTripThumb.value = firstLog.photoUrl
       return
     }
-    const heritage = await heritageApi.getDetail(firstLog.heritageId)
     completedTripThumb.value = heritage.thumbnailUrl
   } catch {
     // 조용히 실패
@@ -156,6 +158,7 @@ async function handleLogout() {
         v-if="latestCompletedTrip"
         :trip="latestCompletedTrip"
         :thumb="completedTripThumb"
+        :fallback-thumb="completedTripFallbackThumb"
         label="가장 최근 여행"
       />
 
