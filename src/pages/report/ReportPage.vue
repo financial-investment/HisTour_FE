@@ -4,15 +4,23 @@ import { useRoute, useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { reportApi } from '@/api/reportApi'
 import { quizApi } from '@/api/quizApi'
+import { tripApi } from '@/api/tripApi'
 import { normalizeAssetUrl } from '@/utils/assetUrl'
 import { loadKakaoMaps, type KakaoMap, type KakaoMapsApi } from '@/utils/kakaoMaps'
-import type { CourseHeritage, QuizResultResponse, ReportResponse, VisitedHeritage } from '@/types/api'
+import type {
+  CourseHeritage,
+  QuizResultResponse,
+  ReportResponse,
+  VisitedHeritage,
+  VisitLogResponse,
+} from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 
 const report = ref<ReportResponse | null>(null)
 const quizResult = ref<QuizResultResponse | null>(null)
+const visitLogs = ref<VisitLogResponse[]>([])
 const isLoading = ref(true)
 const errorMessage = ref('')
 const courseMapElement = ref<HTMLElement | null>(null)
@@ -20,6 +28,13 @@ const courseMapErrorMessage = ref('')
 
 const tripId = computed(() => Number(route.params.tripId))
 const visitedHeritages = computed(() => report.value?.visitedHeritages ?? [])
+const visitLogByHeritageId = computed(() => {
+  const logs = new Map<number, VisitLogResponse>()
+  visitLogs.value.forEach((log) => {
+    if (!logs.has(log.heritageId)) logs.set(log.heritageId, log)
+  })
+  return logs
+})
 const courseHeritages = computed(() => report.value?.course?.heritages ?? [])
 const validCourseHeritages = computed(() =>
   [...courseHeritages.value]
@@ -28,19 +43,21 @@ const validCourseHeritages = computed(() =>
 )
 const summaryParagraphs = computed(() => {
   const summary = report.value?.summary?.trim()
+  if (!summary && visitedHeritages.value.length) {
+    return [
+      `이번 여행에서는 ${visitedHeritages.value.map((heritage) => heritage.name).join(', ')}을 둘러봤습니다.`,
+      '각 유적지에서 남긴 기록을 바탕으로 여행의 흐름과 인상 깊었던 역사적 장면을 정리했습니다.',
+    ]
+  }
   if (!summary) return ['이번 여행의 방문 기록을 바탕으로 역사적 흐름을 정리했습니다.']
   return summary
     .split(/\n{2,}|\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
 })
-const reportSerial = computed(() => {
-  if (!report.value) return 'REC-0000'
-  return `REC-${String(report.value.tripId).padStart(4, '0')}`
-})
 const reportTitle = computed(() => {
   const first = visitedHeritages.value[0]?.name
-  if (!first) return 'Archived Journey Report'
+  if (!first) return '여행 리포트'
   return `${first}에서 시작된 역사 여정`
 })
 const courseTitle = computed(() => {
@@ -50,9 +67,9 @@ const courseTitle = computed(() => {
 })
 const quizResultMessage = computed(() => {
   const accuracy = quizResult.value?.accuracy ?? 0
-  if (accuracy >= 80) return 'Strong recall from this journey'
-  if (accuracy >= 50) return 'Good review checkpoint'
-  return 'Review recommended'
+  if (accuracy >= 80) return '이번 여행을 또렷하게 기억하고 있어요'
+  if (accuracy >= 50) return '좋은 복습 흐름이에요'
+  return '다시 읽어보면 더 오래 남을 기록이에요'
 })
 
 let courseMap: KakaoMap | null = null
@@ -71,8 +88,14 @@ async function loadReport() {
   try {
     isLoading.value = true
     errorMessage.value = ''
-    report.value = await reportApi.get(tripId.value)
-    quizResult.value = await loadSubmittedQuizResult()
+    const [reportResponse, tripDetail, submittedQuizResult] = await Promise.all([
+      reportApi.get(tripId.value),
+      tripApi.getDetail(tripId.value),
+      loadSubmittedQuizResult(),
+    ])
+    report.value = reportResponse
+    visitLogs.value = tripDetail.visitLogs
+    quizResult.value = submittedQuizResult
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '여행 리포트를 불러오지 못했습니다.')
   } finally {
@@ -81,7 +104,7 @@ async function loadReport() {
 }
 
 function getVisitedLabel(index: number) {
-  return `VISIT ${String(index + 1).padStart(2, '0')}`
+  return `방문 ${String(index + 1).padStart(2, '0')}`
 }
 
 function getCourseNumber(index: number) {
@@ -94,6 +117,21 @@ function getFallbackInitial(name: string) {
 
 function openHeritage(heritage: VisitedHeritage | CourseHeritage) {
   router.push(`/heritage/${heritage.heritageId}`)
+}
+
+function openVisitedHeritage(heritage: VisitedHeritage) {
+  const visitLog = visitLogByHeritageId.value.get(heritage.heritageId)
+  if (!visitLog?.explanation) {
+    openHeritage(heritage)
+    return
+  }
+
+  const params = new URLSearchParams({
+    tripId: String(visitLog.tripId),
+    visitLogId: String(visitLog.id),
+    returnTo: `/report/${visitLog.tripId}`,
+  })
+  router.push(`/heritage/${heritage.heritageId}?${params.toString()}`)
 }
 
 function clearCourseMap() {
@@ -246,9 +284,9 @@ onBeforeUnmount(() => {
     <template v-else-if="report">
       <section class="report-hero">
         <div class="hero-meta">
-          <span>Official Report</span>
+          <span>여행 리포트</span>
           <i></i>
-          <small>{{ reportSerial }}</small>
+          <small>{{ visitedHeritages.length }}곳 방문</small>
         </div>
         <h1>{{ reportTitle }}</h1>
         <div class="hero-bars" aria-hidden="true">
@@ -265,13 +303,13 @@ onBeforeUnmount(() => {
             :alt="visitedHeritages[0].name"
           />
           <div v-else class="image-fallback">HisTour</div>
-          <span>CURATED BY AI-HISTORIAN</span>
+          <span>HisTour 여행 기록</span>
         </div>
 
         <article class="narrative-copy">
           <div class="section-kicker">
             <span>✦</span>
-            <h2>Narrative Reconstruction</h2>
+            <h2>여행 요약</h2>
           </div>
           <p v-for="paragraph in summaryParagraphs" :key="paragraph">{{ paragraph }}</p>
         </article>
@@ -280,8 +318,8 @@ onBeforeUnmount(() => {
       <section class="records-section">
         <div class="section-heading">
           <div>
-            <h2>Archived Records</h2>
-            <p>VERIFIED LOCATIONS VISITED</p>
+            <h2>방문한 유적지</h2>
+            <p>여행 중 다녀온 장소</p>
           </div>
         </div>
 
@@ -291,14 +329,14 @@ onBeforeUnmount(() => {
             :key="heritage.heritageId"
             class="record-card"
             type="button"
-            @click="openHeritage(heritage)"
+            @click="openVisitedHeritage(heritage)"
           >
             <div class="record-image">
               <img v-if="heritage.thumbnailUrl" :src="normalizeAssetUrl(heritage.thumbnailUrl)" :alt="heritage.name" />
               <span v-else>{{ getFallbackInitial(heritage.name) }}</span>
               <small>{{ getVisitedLabel(index) }}</small>
             </div>
-            <span>Heritage Archive</span>
+            <span>방문 기록</span>
             <strong>{{ heritage.name }}</strong>
           </button>
         </div>
@@ -323,7 +361,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="course-copy">
-          <span>Recommended Sequence</span>
+          <span>다음 여행 추천</span>
           <h2>{{ courseTitle }}</h2>
 
           <ol v-if="courseHeritages.length">
@@ -341,17 +379,17 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="quiz-cta" :class="{ completed: quizResult }">
-        <h2>Knowledge Verification</h2>
+        <h2>여행 퀴즈</h2>
         <template v-if="quizResult">
           <div class="quiz-result-card">
             <span>{{ quizResultMessage }}</span>
             <strong>{{ quizResult.correctCount }}/{{ quizResult.totalCount }}</strong>
-            <small>{{ quizResult.accuracy }}% accuracy</small>
+            <small>정답률 {{ quizResult.accuracy }}%</small>
           </div>
-          <RouterLink class="result-link" :to="`/quiz/${report.tripId}`">View Quiz Result</RouterLink>
+          <RouterLink class="result-link" :to="`/quiz/${report.tripId}`">퀴즈 결과 보기</RouterLink>
         </template>
         <p>여행 후 퀴즈로 방금 정리한 기록을 오래 남겨보세요.</p>
-        <RouterLink :to="`/quiz/${report.tripId}`">Start Quiz</RouterLink>
+        <RouterLink :to="`/quiz/${report.tripId}`">퀴즈 풀기</RouterLink>
       </section>
     </template>
   </main>

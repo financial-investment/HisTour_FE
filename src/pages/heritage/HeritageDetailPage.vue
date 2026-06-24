@@ -40,6 +40,17 @@ const carouselItems = computed(() =>
 const periodLabel = computed(() =>
   heritage.value?.period ? (PERIOD_NAMES[heritage.value.period] ?? heritage.value.period) : null,
 )
+const archivedExplanationQuery = computed(() => {
+  const tripId = typeof route.query.tripId === 'string' ? route.query.tripId : ''
+  const visitLogId = typeof route.query.visitLogId === 'string' ? route.query.visitLogId : ''
+  const returnTo = typeof route.query.returnTo === 'string' ? route.query.returnTo : ''
+  if (!tripId || !visitLogId) return ''
+
+  const params = new URLSearchParams({ tripId, visitLogId })
+  if (returnTo.startsWith('/')) params.set('returnTo', returnTo)
+  return params.toString()
+})
+const canOpenArchivedExplanation = computed(() => !!archivedExplanationQuery.value)
 
 
 async function renderMap() {
@@ -63,6 +74,11 @@ async function renderMap() {
   } catch {
     mapError.value = true
   }
+}
+
+function openArchivedExplanation() {
+  if (!archivedExplanationQuery.value) return
+  router.push(`/heritage/explanation?${archivedExplanationQuery.value}`)
 }
 
 onMounted(async () => {
@@ -138,6 +154,14 @@ onBeforeUnmount(() => {
           <span v-if="heritage.category" class="tag">{{ heritage.category }}</span>
           <span v-if="periodLabel" class="tag tag--period">{{ periodLabel }}</span>
         </div>
+
+        <section v-if="canOpenArchivedExplanation" class="visit-explanation-panel">
+          <div>
+            <strong>여행 중 생성한 해설이 있어요</strong>
+            <p>이 방문 기록에서 만들었던 AI 해설과 심화 해설을 다시 볼 수 있습니다.</p>
+          </div>
+          <button type="button" @click="openArchivedExplanation">생성된 해설 보기</button>
+        </section>
 
         <!-- 설명 -->
         <section v-if="heritage.description" class="section">
@@ -269,6 +293,41 @@ onBeforeUnmount(() => {
 .tag--period {
   background: var(--color-primary-container);
   color: var(--color-on-primary);
+}
+
+.visit-explanation-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 26px;
+  padding: 16px;
+  border: 1px solid rgba(23, 52, 92, 0.16);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(26, 43, 72, 0.06);
+}
+
+.visit-explanation-panel strong {
+  display: block;
+  color: var(--color-on-surface);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.visit-explanation-panel p {
+  margin-top: 5px;
+  color: var(--color-on-surface-variant);
+  font-size: 12px;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.visit-explanation-panel button {
+  min-height: 46px;
+  border-radius: 10px;
+  color: #fff;
+  background: #17345c;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 /* sections */
