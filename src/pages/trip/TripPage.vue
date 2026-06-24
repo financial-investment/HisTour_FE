@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { heritageApi } from '@/api/heritageApi'
 import { tripApi } from '@/api/tripApi'
 import { getCurrentCoordinates, type Coordinates } from '@/composables/useGeolocation'
 import type { RecommendedHeritage, TripDetailResponse, TripResponse } from '@/types/api'
@@ -17,6 +18,7 @@ const activeTrip = ref<TripDetailResponse | null>(null)
 const recommendations = ref<RecommendedHeritage[]>([])
 const selectedHeritage = ref<RecommendedHeritage | null>(null)
 const coordinates = ref<Coordinates | null>(null)
+const heritageLocations = ref<Record<number, { lat: number; lng: number }>>({})
 const mapSection = ref<InstanceType<typeof TripMapSection> | null>(null)
 const title = ref('')
 const tripDate = ref(new Date().toISOString().slice(0, 10))
@@ -29,10 +31,45 @@ const errorMessage = ref('')
 
 const hasActiveTrip = computed(() => Boolean(activeTrip.value))
 const visitedLogs = computed(() => activeTrip.value?.visitLogs ?? [])
+const mapVisitedLogs = computed(() =>
+  visitedLogs.value.map((log) => {
+    const heritageLocation = heritageLocations.value[log.heritageId]
+    if (!heritageLocation) return log
+    return { ...log, lat: heritageLocation.lat, lng: heritageLocation.lng }
+  }),
+)
 
 async function renderTripMap() {
   await nextTick()
   await mapSection.value?.renderMap()
+}
+
+async function loadVisitedHeritageLocations() {
+  const missingHeritageIds = [
+    ...new Set(
+      visitedLogs.value
+        .map((log) => log.heritageId)
+        .filter((heritageId) => !heritageLocations.value[heritageId]),
+    ),
+  ]
+
+  if (!missingHeritageIds.length) return
+
+  const loadedLocations = await Promise.all(
+    missingHeritageIds.map(async (heritageId) => {
+      try {
+        const heritage = await heritageApi.getDetail(heritageId)
+        return [heritageId, { lat: heritage.lat, lng: heritage.lng }] as const
+      } catch {
+        return null
+      }
+    }),
+  )
+
+  heritageLocations.value = {
+    ...heritageLocations.value,
+    ...Object.fromEntries(loadedLocations.filter((location) => location !== null)),
+  }
 }
 
 async function loadTrips() {
@@ -43,6 +80,7 @@ async function loadTrips() {
     const current = trips.value.find((trip) => trip.status === 'IN_PROGRESS')
     if (current) {
       activeTrip.value = await tripApi.getDetail(current.tripId)
+      await loadVisitedHeritageLocations()
       coordinates.value = await getCurrentCoordinates()
     }
   } catch {
@@ -68,6 +106,7 @@ async function createTrip() {
       tripDate: tripDate.value || undefined,
     })
     activeTrip.value = await tripApi.getDetail(tripId)
+    await loadVisitedHeritageLocations()
     coordinates.value = await getCurrentCoordinates()
     await loadRecommendations()
     await renderTripMap()
@@ -156,7 +195,7 @@ onMounted(loadTrips)
       v-model:selected-heritage="selectedHeritage"
       :coordinates="coordinates"
       :recommendations="recommendations"
-      :visited-logs="visitedLogs"
+      :visited-logs="mapVisitedLogs"
       :is-loading-recommendations="isLoadingRecommendations"
       @refresh="refreshNearbyHeritages"
     />
