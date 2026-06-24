@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { heritageApi } from '@/api/heritageApi'
+import { tripApi } from '@/api/tripApi'
 import { useJourneyStore } from '@/stores/journeyStore'
+import { normalizeAssetUrl } from '@/utils/assetUrl'
+import type { ExplainResponse } from '@/types/api'
 
+const route = useRoute()
 const router = useRouter()
 const journeyStore = useJourneyStore()
 type ExplainTopic = 'STORY' | 'PERSON' | 'ARCHITECTURE' | 'CONTEXT' | 'MODERN'
@@ -11,8 +16,14 @@ type ExplainTopic = 'STORY' | 'PERSON' | 'ARCHITECTURE' | 'CONTEXT' | 'MODERN'
 const selectedTopic = ref<ExplainTopic>('STORY')
 const deepExplanation = ref('')
 const isLoadingDeep = ref(false)
+const isLoadingArchived = ref(false)
 const errorMessage = ref('')
-const result = computed(() => journeyStore.explanation)
+const archivedExplanation = ref<ExplainResponse | null>(null)
+const archivedPreviewUrl = ref<string | null>(null)
+const archivedTripId = ref<number | null>(null)
+const result = computed(() => journeyStore.explanation ?? archivedExplanation.value)
+const previewUrl = computed(() => journeyStore.previewUrl ?? archivedPreviewUrl.value)
+const isArchivedMode = computed(() => !!archivedExplanation.value && !journeyStore.explanation)
 const topics: { value: ExplainTopic; icon: string; label: string; description: string }[] = [
   { value: 'STORY', icon: '✦', label: '숨겨진 이야기', description: '잘 알려지지 않은 비화' },
   { value: 'PERSON', icon: '♙', label: '역사적 인물', description: '이곳을 거쳐간 사람들' },
@@ -23,6 +34,40 @@ const topics: { value: ExplainTopic; icon: string; label: string; description: s
 const selectedTopicLabel = computed(
   () => topics.find((topic) => topic.value === selectedTopic.value)?.label ?? '',
 )
+
+onMounted(loadArchivedExplanation)
+
+async function loadArchivedExplanation() {
+  if (journeyStore.explanation) return
+
+  const tripId = Number(route.query.tripId)
+  const visitLogId = Number(route.query.visitLogId)
+  if (!Number.isFinite(tripId) || !Number.isFinite(visitLogId)) return
+
+  isLoadingArchived.value = true
+  errorMessage.value = ''
+  try {
+    const detail = await tripApi.getDetail(tripId)
+    const visitLog = detail.visitLogs.find((log) => log.id === visitLogId)
+    if (!visitLog?.explanation) {
+      errorMessage.value = '저장된 해설 기록을 찾지 못했어요.'
+      return
+    }
+
+    archivedTripId.value = tripId
+    archivedPreviewUrl.value = visitLog.photoUrl ? normalizeAssetUrl(visitLog.photoUrl) : null
+    archivedExplanation.value = {
+      heritageId: visitLog.heritageId,
+      heritageName: visitLog.heritageName,
+      explanation: visitLog.explanation,
+      visitLogId: visitLog.id,
+    }
+  } catch {
+    errorMessage.value = '저장된 해설을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    isLoadingArchived.value = false
+  }
+}
 
 async function requestDeepExplanation() {
   if (!result.value?.visitLogId || isLoadingDeep.value) return
@@ -43,33 +88,40 @@ async function requestDeepExplanation() {
 }
 
 function returnToTrip() {
-  const tripId = journeyStore.tripId
+  const tripId = journeyStore.tripId ?? archivedTripId.value
+  const fallbackPath = tripId ? `/report/${tripId}` : '/mypage'
+  const returnTo =
+    typeof route.query.returnTo === 'string' && route.query.returnTo.startsWith('/')
+      ? route.query.returnTo
+      : ''
   journeyStore.clear()
-  router.replace(tripId ? '/trip' : '/')
+  router.replace(isArchivedMode.value ? returnTo || fallbackPath : tripId ? '/trip' : '/')
 }
 </script>
 
 <template>
   <main v-if="result" class="explanation-page">
     <header>
-      <button type="button" aria-label="여행으로 돌아가기" @click="returnToTrip">←</button>
-      <strong>HisTour Archive</strong>
+      <button type="button" aria-label="이전 화면으로 돌아가기" @click="returnToTrip">←</button>
+      <strong>{{ isArchivedMode ? '저장된 해설' : 'HisTour Archive' }}</strong>
       <span>AI</span>
     </header>
 
     <section class="hero">
-      <img v-if="journeyStore.previewUrl" :src="journeyStore.previewUrl" :alt="result.heritageName" />
+      <img v-if="previewUrl" :src="previewUrl" :alt="result.heritageName" />
       <div class="hero-shade" />
       <div class="hero-copy">
-        <p>HERITAGE IDENTIFIED</p>
+        <p>{{ isArchivedMode ? '저장된 여행 기록' : 'HERITAGE IDENTIFIED' }}</p>
         <h1>{{ result.heritageName }}</h1>
-        <span>현장 사진과 위치를 기반으로 찾았습니다</span>
+        <span>
+          {{ isArchivedMode ? '여행 중 남긴 해설을 다시 열었습니다' : '현장 사진과 위치를 기반으로 찾았습니다' }}
+        </span>
       </div>
     </section>
 
     <section class="content">
       <article class="explanation-card">
-        <div class="card-label"><span>01</span><p>BASIC EXPLANATION</p></div>
+        <div class="card-label"><span>01</span><p>기본 해설</p></div>
         <p class="explanation-text">{{ result.explanation }}</p>
         <footer><i />HISTOUR AI CURATOR<i /></footer>
       </article>
@@ -103,12 +155,16 @@ function returnToTrip() {
         <p>{{ deepExplanation }}</p>
       </article>
 
-      <button class="return-button" type="button" @click="returnToTrip">여행 지도로 돌아가기</button>
+      <button class="return-button" type="button" @click="returnToTrip">
+        {{ isArchivedMode ? '리포트로 돌아가기' : '여행 지도로 돌아가기' }}
+      </button>
     </section>
   </main>
 
+  <LoadingOverlay v-else-if="isLoadingArchived" message="저장된 해설을 불러오고 있어요" />
+
   <main v-else class="missing-result">
-    <span>⌕</span><h1>해설 기록이 없어요</h1><p>여행 지도에서 문화재를 먼저 스캔해 주세요.</p>
+    <span>⌕</span><h1>해설 기록이 없어요</h1><p>{{ errorMessage || '여행 지도에서 문화재를 먼저 스캔해 주세요.' }}</p>
     <RouterLink to="/trip">여행으로 돌아가기</RouterLink>
   </main>
 </template>

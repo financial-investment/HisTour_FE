@@ -12,13 +12,23 @@ const props = defineProps<{
 
 const { loadThumbnails, getThumbnail } = useHeritageThumbnails()
 
+function getVisitLink(log: VisitLogResponse) {
+  if (!log.explanation) return `/heritage/${log.heritageId}`
+  const params = new URLSearchParams({
+    tripId: String(log.tripId),
+    visitLogId: String(log.id),
+    returnTo: '/mypage',
+  })
+  return `/heritage/${log.heritageId}?${params.toString()}`
+}
+
 const carouselItems = computed<CarouselItem[]>(() =>
   props.logs
     .filter((l) => l.photoUrl)
     .map((l) => ({
       url: l.photoUrl!,
       label: l.heritageName,
-      linkTo: `/heritage/${l.heritageId}`,
+      linkTo: getVisitLink(l),
       fallbackUrl: getThumbnail(l.heritageId),
     })),
 )
