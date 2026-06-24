@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { heritageApi } from '@/api/heritageApi'
 import { tripApi } from '@/api/tripApi'
+import { useToast } from '@/composables/useToast'
 import { getCurrentCoordinates, type Coordinates } from '@/composables/useGeolocation'
 import type { RecommendedHeritage, TripDetailResponse, TripResponse } from '@/types/api'
 import TripActiveHeader from './components/TripActiveHeader.vue'
@@ -13,6 +14,7 @@ import TripRecommendationSection from './components/TripRecommendationSection.vu
 import TripVisitedSection from './components/TripVisitedSection.vue'
 
 const router = useRouter()
+const toast = useToast()
 const trips = ref<TripResponse[]>([])
 const activeTrip = ref<TripDetailResponse | null>(null)
 const recommendations = ref<RecommendedHeritage[]>([])
@@ -149,8 +151,16 @@ async function refreshNearbyHeritages() {
   await renderTripMap()
 }
 
+function requestCompleteTrip() {
+  if (!visitedLogs.value.length) {
+    toast.info('최소 1개 이상의 문화재를 방문해야 여행을 종료할 수 있어요.')
+    return
+  }
+  showCompleteDialog.value = true
+}
+
 async function completeTrip() {
-  if (!activeTrip.value || isCompleting.value) return
+  if (!activeTrip.value || isCompleting.value || !visitedLogs.value.length) return
   isCompleting.value = true
   errorMessage.value = ''
   try {
@@ -187,7 +197,7 @@ onMounted(loadTrips)
     <TripActiveHeader
       :active-trip="activeTrip"
       :visited-count="visitedLogs.length"
-      @complete="showCompleteDialog = true"
+      @complete="requestCompleteTrip"
     />
 
     <TripMapSection
