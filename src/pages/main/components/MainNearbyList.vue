@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RecommendedHeritage } from '@/types/api'
+import { normalizeAssetUrl } from '@/utils/assetUrl'
 
 defineProps<{
   heritages: RecommendedHeritage[]
@@ -27,7 +28,7 @@ function formatDistance(m: number) {
     <ul v-else-if="heritages.length > 0" class="nearby-list">
       <li v-for="h in heritages" :key="h.heritageId">
         <RouterLink :to="`/heritage/${h.heritageId}`" class="nearby-item">
-          <img v-if="h.thumbnailUrl" :src="h.thumbnailUrl" :alt="h.name" class="nearby-thumb" />
+          <img v-if="h.thumbnailUrl" :src="normalizeAssetUrl(h.thumbnailUrl)" :alt="h.name" class="nearby-thumb" />
           <div v-else class="nearby-thumb-placeholder" aria-hidden="true"></div>
           <div class="nearby-info">
             <span class="nearby-name">{{ h.name }}</span>

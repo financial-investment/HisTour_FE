@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { normalizeAssetUrl } from '@/utils/assetUrl'
 
 export interface CarouselItem {
   url: string
@@ -45,7 +46,7 @@ const showDots = computed(() => props.items.length <= 10)
           :to="item.linkTo"
           class="slide"
         >
-          <img :src="item.url" :alt="item.label ?? '이미지'" class="slide-img" />
+          <img :src="normalizeAssetUrl(item.url)" :alt="item.label ?? '이미지'" class="slide-img" />
           <div v-if="item.label" class="slide-overlay">
             <span class="slide-label">{{ item.label }}</span>
           </div>

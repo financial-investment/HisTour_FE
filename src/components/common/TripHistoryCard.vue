@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { normalizeAssetUrl } from '@/utils/assetUrl'
 import type { TripResponse } from '@/types/api'
 
 const props = defineProps<{
@@ -21,7 +22,7 @@ function formatDate(tripDate: string | null, createdAt: string) {
 <template>
   <RouterLink :to="`/report/${trip.tripId}`" class="trip-history-card">
     <div class="thumb-wrap">
-      <img v-if="thumb" :src="thumb" :alt="trip.title ?? ''" class="thumb" />
+      <img v-if="thumb" :src="normalizeAssetUrl(thumb)" :alt="trip.title ?? ''" class="thumb" />
       <div v-else class="thumb-placeholder" aria-hidden="true">
         <svg
           viewBox="0 0 40 40"

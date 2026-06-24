@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { VisitLogResponse } from '@/types/api'
+import { normalizeAssetUrl } from '@/utils/assetUrl'
 
 defineProps<{
   logs: VisitLogResponse[]
@@ -26,7 +27,7 @@ function formatTime(value: string) {
     </div>
     <div v-if="logs.length" class="visit-list">
       <article v-for="log in logs" :key="log.id" class="visit-card">
-        <img v-if="log.photoUrl" :src="log.photoUrl" :alt="log.heritageName" />
+        <img v-if="log.photoUrl" :src="normalizeAssetUrl(log.photoUrl)" :alt="log.heritageName" />
         <div v-else class="photo-placeholder" aria-hidden="true">🏛</div>
         <div>
           <strong>{{ log.heritageName }}</strong>
