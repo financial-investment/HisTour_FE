@@ -171,8 +171,14 @@ function formatDistance(distanceM: number) {
   padding: 0;
 }
 
+.recommendation-list > li {
+  min-width: 0;
+}
+
 .recommendation-card {
+  box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
   min-height: 76px;
   padding: 10px;
   border: 1px solid #dce2eb;
@@ -193,10 +199,12 @@ function formatDistance(distanceM: number) {
 
 .select-button {
   min-width: 0;
+  padding: 0;
   flex: 1;
   display: flex;
   align-items: center;
   gap: 12px;
+  overflow: hidden;
   text-align: left;
 }
 .select-button img,
@@ -235,6 +243,7 @@ function formatDistance(distanceM: number) {
 }
 .detail-link {
   min-width: 50px;
+  flex: 0 0 50px;
   min-height: 32px;
   border: 1px solid #cbd3df;
   border-radius: 17px;
