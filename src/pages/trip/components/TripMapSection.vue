@@ -119,9 +119,19 @@ async function fetchViewportHeritages() {
   const bounds = map.getBounds()
   const sw = bounds.getSouthWest()
   const ne = bounds.getNorthEast()
+
+  // 줌인 시 viewport가 너무 좁아져 문화재가 안 보이는 문제 방지
+  // 최소 약 1km x 1km 범위를 보장한다 (0.005° ≈ 550m)
+  const MIN_HALF_DELTA = 0.005
+  const midLat = (sw.getLat() + ne.getLat()) / 2
+  const midLng = (sw.getLng() + ne.getLng()) / 2
+  const halfLat = Math.max((ne.getLat() - sw.getLat()) / 2, MIN_HALF_DELTA)
+  const halfLng = Math.max((ne.getLng() - sw.getLng()) / 2, MIN_HALF_DELTA)
+
   try {
     const items = await heritageApi.getMapHeritages(
-      sw.getLat(), sw.getLng(), ne.getLat(), ne.getLng(),
+      midLat - halfLat, midLng - halfLng,
+      midLat + halfLat, midLng + halfLng,
     )
     updateClusterer(items)
   } catch {
@@ -231,7 +241,7 @@ async function renderMap() {
     clusterer = new kakaoMaps.MarkerClusterer({
       map,
       averageCenter: true,
-      minLevel: 3,
+      minLevel: 1,
       minClusterSize: 2,
       disableClickZoom: true,
       gridSize: 60,
