@@ -1,3 +1,18 @@
+export async function extractGpsFromFile(
+  file: File,
+): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const { parse } = await import('exifr')
+    const gps = await parse(file, { gps: true })
+    if (gps?.latitude != null && gps?.longitude != null) {
+      return { lat: gps.latitude, lng: gps.longitude }
+    }
+  } catch {
+    // EXIF 없거나 파싱 실패 → 폴백
+  }
+  return null
+}
+
 export async function fileToBase64(file: File): Promise<string> {
   const converted = await convertIfHeic(file)
   return new Promise((resolve, reject) => {
