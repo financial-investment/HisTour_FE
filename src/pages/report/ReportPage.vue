@@ -7,6 +7,7 @@ import { reportApi } from '@/api/reportApi'
 import { quizApi } from '@/api/quizApi'
 import { tripApi } from '@/api/tripApi'
 import type { QuizResultResponse, ReportResponse, VisitLogResponse } from '@/types/api'
+import { getErrorMessage } from '@/utils/errorUtils'
 import ReportHero from './components/ReportHero.vue'
 import ReportNarrative from './components/ReportNarrative.vue'
 import ReportVisitedSection from './components/ReportVisitedSection.vue'
@@ -106,13 +107,6 @@ async function loadSubmittedQuizResult() {
   }
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const res = (error as { response?: { data?: { message?: string } } }).response
-    return res?.data?.message || fallback
-  }
-  return fallback
-}
 </script>
 
 <template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TripResponse, RecommendedHeritage } from '@/types/api'
+import { formatShortDate } from '@/utils/formatDate'
 import MainNearbyList from './MainNearbyList.vue'
 
 defineProps<{
@@ -9,10 +10,6 @@ defineProps<{
   nearbyError: 'geo' | 'empty' | null
 }>()
 
-function formatDate(dateStr: string | null) {
-  if (!dateStr) return ''
-  return dateStr.slice(0, 10).replace(/-/g, '.')
-}
 </script>
 
 <template>
@@ -23,7 +20,7 @@ function formatDate(dateStr: string | null) {
           <span class="pulse"></span>
           진행 중
         </span>
-        <span class="active-date">{{ formatDate(trip.tripDate ?? trip.createdAt) }}</span>
+        <span class="active-date">{{ formatShortDate(trip.tripDate ?? trip.createdAt) }}</span>
       </div>
       <h2 class="active-title">{{ trip.title ?? '진행 중인 여행' }}</h2>
       <div class="active-footer">

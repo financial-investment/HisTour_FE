@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { applyFallbackAsset, normalizeAssetUrl } from '@/utils/assetUrl'
+import { formatShortDate } from '@/utils/formatDate'
 import type { TripResponse } from '@/types/api'
 
 const props = defineProps<{
@@ -15,9 +16,6 @@ const daysSince = computed(() => {
   return Math.floor((Date.now() - new Date(raw).getTime()) / (1000 * 60 * 60 * 24))
 })
 
-function formatDate(tripDate: string | null, createdAt: string) {
-  return (tripDate ?? createdAt).slice(0, 10).replace(/-/g, '.')
-}
 </script>
 
 <template>
@@ -63,7 +61,7 @@ function formatDate(tripDate: string | null, createdAt: string) {
             <rect x="1.5" y="2.5" width="11" height="10" rx="1.5" />
             <path d="M4 1.5v2M10 1.5v2M1.5 6h11" />
           </svg>
-          {{ formatDate(trip.tripDate, trip.createdAt) }}
+          {{ formatShortDate(trip.tripDate ?? trip.createdAt) }}
         </span>
         <span>
           <svg

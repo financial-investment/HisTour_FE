@@ -11,6 +11,7 @@ import type {
   QuizSessionResponse,
   TripResponse,
 } from '@/types/api'
+import { getErrorMessage, getResponseStatus } from '@/utils/errorUtils'
 import QuizHeader from './components/QuizHeader.vue'
 import QuizIndex from './components/QuizIndex.vue'
 import QuizQuestion from './components/QuizQuestion.vue'
@@ -135,21 +136,6 @@ async function restoreSubmittedResult() {
   }, {})
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const res = (error as { response?: { data?: { message?: string } } }).response
-    return res?.data?.message || fallback
-  }
-  return fallback
-}
-
-function getResponseStatus(error: unknown) {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const res = error as { response?: { status?: number } }
-    return res.response?.status
-  }
-  return undefined
-}
 </script>
 
 <template>

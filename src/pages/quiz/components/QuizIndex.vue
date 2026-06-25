@@ -1,19 +1,13 @@
 <script setup lang="ts">
 import type { TripResponse } from '@/types/api'
+import { formatTripDate } from '@/utils/formatDate'
 
 defineProps<{
   trips: TripResponse[]
 }>()
 
-function formatDate(value: string | null) {
-  if (!value) return '날짜 미정'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }).format(date)
-}
-
 function formatTripTitle(trip: TripResponse) {
-  return trip.title || `${formatDate(trip.tripDate || trip.createdAt)} 여행`
+  return trip.title || `${formatTripDate(trip.tripDate || trip.createdAt)} 여행`
 }
 </script>
 
@@ -34,7 +28,7 @@ function formatTripTitle(trip: TripResponse) {
       >
         <div>
           <strong>{{ formatTripTitle(trip) }}</strong>
-          <span>{{ formatDate(trip.tripDate || trip.createdAt) }}</span>
+          <span>{{ formatTripDate(trip.tripDate || trip.createdAt) }}</span>
         </div>
         <small>{{ trip.visitCount }}곳 방문</small>
       </RouterLink>

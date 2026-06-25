@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TripDetailResponse } from '@/types/api'
+import { formatTripDate } from '@/utils/formatDate'
 
 defineProps<{
   activeTrip: TripDetailResponse
@@ -10,14 +11,6 @@ defineEmits<{
   complete: []
 }>()
 
-function formatDate(value?: string | null) {
-  if (!value) return '오늘'
-  return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(`${value}T00:00:00`))
-}
 </script>
 
 <template>
@@ -25,7 +18,7 @@ function formatDate(value?: string | null) {
     <div>
       <p>ACTIVE JOURNEY</p>
       <h1>{{ activeTrip.title || '나의 역사 여행' }}</h1>
-      <span>{{ formatDate(activeTrip.tripDate) }} · 방문 {{ visitedCount }}곳</span>
+      <span>{{ formatTripDate(activeTrip.tripDate, '오늘') }} · 방문 {{ visitedCount }}곳</span>
     </div>
     <button
       type="button"
