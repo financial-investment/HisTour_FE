@@ -2,8 +2,17 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { useDeviceHeading } from '@/composables/useDeviceHeading'
 import type { Coordinates } from '@/composables/useGeolocation'
-import type { RecommendedHeritage, VisitLogResponse } from '@/types/api'
-import { loadKakaoMaps, type KakaoMap, type KakaoMapsApi } from '@/utils/kakaoMaps'
+import type { HeritageMapItem, RecommendedHeritage, VisitLogResponse } from '@/types/api'
+import { heritageApi } from '@/api/heritageApi'
+import {
+  loadKakaoMaps,
+  type KakaoCluster,
+  type KakaoLatLng,
+  type KakaoMap,
+  type KakaoMarker,
+  type KakaoMarkerClusterer,
+  type KakaoMapsApi,
+} from '@/utils/kakaoMaps'
 
 const props = defineProps<{
   coordinates: Coordinates | null
@@ -21,10 +30,18 @@ const emit = defineEmits<{
 const { heading, requestHeadingPermission, stopHeading } = useDeviceHeading()
 const mapElement = ref<HTMLElement | null>(null)
 const mapErrorMessage = ref('')
+const clusterPopup = ref<HeritageMapItem[] | null>(null)
+
 let map: KakaoMap | null = null
 let kakaoMaps: KakaoMapsApi | null = null
 let mapObjects: Array<{ setMap(map: KakaoMap | null): void }> = []
 let currentMarkerElement: HTMLElement | null = null
+let currentOverlay: { setMap(map: KakaoMap | null): void; setPosition(pos: KakaoLatLng): void } | null = null
+let clusterer: KakaoMarkerClusterer | null = null
+let idleDebounceTimer: ReturnType<typeof setTimeout> | null = null
+const markerDataMap = new Map<KakaoMarker, HeritageMapItem>()
+let recommendationOverlays: Array<{ setMap(map: KakaoMap | null): void }> = []
+const recMarkerEls = new Map<number, HTMLElement>()
 
 const MIN_ROUTE_CURVE_OFFSET = 0.00035
 const ROUTE_CURVE_STEPS = 18
@@ -89,9 +106,72 @@ async function moveToCurrentLocation() {
   if (map.getLevel() > 4) map.setLevel(4, { anchor: currentPosition, animate: true })
 }
 
+function panTo(lat: number, lng: number) {
+  if (!map || !kakaoMaps) return
+  clusterPopup.value = null
+  map.panTo(new kakaoMaps.LatLng(lat, lng))
+  if (map.getLevel() > 5) map.setLevel(5, { animate: true })
+}
+
+function onMapIdle() {
+  if (idleDebounceTimer) clearTimeout(idleDebounceTimer)
+  idleDebounceTimer = setTimeout(fetchViewportHeritages, 300)
+}
+
+async function fetchViewportHeritages() {
+  if (!map || !kakaoMaps || !clusterer) return
+  const bounds = map.getBounds()
+  const sw = bounds.getSouthWest()
+  const ne = bounds.getNorthEast()
+
+  // 줌인 시 viewport가 너무 좁아져 문화재가 안 보이는 문제 방지
+  // 최소 약 1km x 1km 범위를 보장한다 (0.005° ≈ 550m)
+  const MIN_HALF_DELTA = 0.005
+  const midLat = (sw.getLat() + ne.getLat()) / 2
+  const midLng = (sw.getLng() + ne.getLng()) / 2
+  const halfLat = Math.max((ne.getLat() - sw.getLat()) / 2, MIN_HALF_DELTA)
+  const halfLng = Math.max((ne.getLng() - sw.getLng()) / 2, MIN_HALF_DELTA)
+
+  try {
+    const items = await heritageApi.getMapHeritages(
+      midLat - halfLat, midLng - halfLng,
+      midLat + halfLat, midLng + halfLng,
+    )
+    updateClusterer(items)
+  } catch {
+    // 시야 내 문화재 로딩 실패는 조용히 처리 (지도 동작에 영향 없음)
+  }
+}
+
+function updateClusterer(items: HeritageMapItem[]) {
+  if (!kakaoMaps || !clusterer) return
+  clusterer.clear()
+  markerDataMap.clear()
+  clusterPopup.value = null
+
+  const markers = items.map((item) => {
+    const marker = new kakaoMaps!.Marker({
+      position: new kakaoMaps!.LatLng(item.lat, item.lng),
+      title: item.name,
+    })
+    markerDataMap.set(marker, item)
+    kakaoMaps!.event.addListener(marker, 'click', () => {
+      clusterPopup.value = [item]
+    })
+    return marker
+  })
+
+  clusterer.addMarkers(markers)
+}
+
 async function renderMap() {
   if (!mapElement.value || !props.coordinates) return
   mapErrorMessage.value = ''
+
+  if (idleDebounceTimer) clearTimeout(idleDebounceTimer)
+  clusterer?.clear()
+  clusterer = null
+  markerDataMap.clear()
 
   try {
     kakaoMaps = await loadKakaoMaps()
@@ -100,7 +180,7 @@ async function renderMap() {
     mapElement.value.replaceChildren()
 
     const center = new kakaoMaps.LatLng(props.coordinates.lat, props.coordinates.lng)
-    map = new kakaoMaps.Map(mapElement.value, { center, level: 4 })
+    map = new kakaoMaps.Map(mapElement.value, { center, level: 4, maxLevel: 8 })
 
     currentMarkerElement = document.createElement('div')
     currentMarkerElement.className = 'current-location-marker'
@@ -108,7 +188,7 @@ async function renderMap() {
     currentMarkerElement.style.setProperty('--device-heading', `${heading.value ?? 0}deg`)
     currentMarkerElement.classList.toggle('has-heading', heading.value !== null)
     currentMarkerElement.innerHTML = '<i aria-hidden="true"></i><span></span>'
-    const currentOverlay = new kakaoMaps.CustomOverlay({
+    currentOverlay = new kakaoMaps.CustomOverlay({
       position: center,
       content: currentMarkerElement,
       xAnchor: 0.5,
@@ -162,26 +242,26 @@ async function renderMap() {
       }
     }
 
-    props.recommendations.forEach((heritage) => {
-      const marker = document.createElement('button')
-      marker.type = 'button'
-      marker.className = 'recommended-map-marker'
-      marker.title = heritage.name
-      marker.setAttribute('aria-label', `${heritage.name}, ${formatDistance(heritage.distanceM)}`)
-      marker.innerHTML = '<span aria-hidden="true">◆</span>'
-      marker.addEventListener('click', () => {
-        emit('update:selectedHeritage', heritage)
-      })
-      const overlay = new kakaoMaps!.CustomOverlay({
-        position: new kakaoMaps!.LatLng(heritage.lat, heritage.lng),
-        content: marker,
-        xAnchor: 0.5,
-        yAnchor: 1,
-        zIndex: 2,
-      })
-      overlay.setMap(map)
-      mapObjects.push(overlay)
+    clusterer = new kakaoMaps.MarkerClusterer({
+      map,
+      averageCenter: true,
+      minLevel: 1,
+      minClusterSize: 2,
+      disableClickZoom: true,
+      gridSize: 60,
     })
+
+    kakaoMaps.event.addListener(clusterer, 'clusterclick', (cluster: KakaoCluster) => {
+      const heritages = cluster
+        .getMarkers()
+        .map((m) => markerDataMap.get(m))
+        .filter((h): h is HeritageMapItem => Boolean(h))
+      if (heritages.length) clusterPopup.value = heritages
+    })
+
+    kakaoMaps.event.addListener(map, 'idle', onMapIdle)
+    fetchViewportHeritages()
+    renderRecommendationMarkers()
   } catch {
     map = null
     mapErrorMessage.value = import.meta.env.VITE_KAKAO_MAP_APP_KEY
@@ -190,6 +270,49 @@ async function renderMap() {
   }
 }
 
+function renderRecommendationMarkers() {
+  if (!map || !kakaoMaps) return
+  recommendationOverlays.forEach((o) => o.setMap(null))
+  recommendationOverlays = []
+  recMarkerEls.clear()
+
+  props.recommendations.forEach((heritage) => {
+    const el = document.createElement('div')
+    el.className = 'rec-map-marker'
+    el.title = heritage.name
+    el.dataset.selected = String(props.selectedHeritage?.heritageId === heritage.heritageId)
+    el.innerHTML = `<span>${heritage.name.length > 6 ? heritage.name.slice(0, 6) + '…' : heritage.name}</span>`
+    el.addEventListener('click', () => {
+      emit('update:selectedHeritage', heritage)
+      clusterPopup.value = null
+    })
+    recMarkerEls.set(heritage.heritageId, el)
+
+    const overlay = new kakaoMaps!.CustomOverlay({
+      position: new kakaoMaps!.LatLng(heritage.lat, heritage.lng),
+      content: el,
+      xAnchor: 0.5,
+      yAnchor: 1.3,
+      zIndex: 4,
+    })
+    overlay.setMap(map)
+    recommendationOverlays.push(overlay)
+  })
+}
+
+watch(() => props.coordinates, (coords) => {
+  if (!coords || !kakaoMaps || !currentOverlay) return
+  const pos = new kakaoMaps.LatLng(coords.lat, coords.lng)
+  currentOverlay.setPosition(pos)
+})
+
+watch(() => props.recommendations, renderRecommendationMarkers, { deep: false })
+watch(() => props.selectedHeritage, (heritage) => {
+  recMarkerEls.forEach((el, id) => {
+    el.dataset.selected = String(heritage?.heritageId === id)
+  })
+})
+
 watch(heading, (value) => {
   currentMarkerElement?.classList.toggle('has-heading', value !== null)
   if (value !== null) currentMarkerElement?.style.setProperty('--device-heading', `${value}deg`)
@@ -197,13 +320,20 @@ watch(heading, (value) => {
 
 onBeforeUnmount(() => {
   stopHeading()
+  if (idleDebounceTimer) clearTimeout(idleDebounceTimer)
+  clusterer?.clear()
+  clusterer = null
+  markerDataMap.clear()
+  recommendationOverlays.forEach((o) => o.setMap(null))
+  recommendationOverlays = []
+  recMarkerEls.clear()
   mapObjects.forEach((object) => object.setMap(null))
   mapObjects = []
   currentMarkerElement = null
   map = null
 })
 
-defineExpose({ renderMap })
+defineExpose({ renderMap, panTo })
 </script>
 
 <template>
@@ -217,7 +347,7 @@ defineExpose({ renderMap })
       <strong>{{ coordinates?.isFallback ? '서울 중심 지도' : '현재 위치 연결됨' }}</strong>
       <span v-if="isLoadingRecommendations">주변 문화유산을 찾고 있어요.</span>
       <span v-else-if="recommendations.length"
-        >가까운 문화유산 {{ recommendations.length }}곳을 찾았어요.</span
+        >가까운 추천 유적지 {{ recommendations.length }}곳</span
       >
       <span v-else>{{
         coordinates?.isFallback
@@ -243,8 +373,8 @@ defineExpose({ renderMap })
       <button
         type="button"
         :disabled="isLoadingRecommendations"
-        aria-label="주변 문화유산 새로고침"
-        title="주변 문화유산 새로고침"
+        aria-label="주변 추천 새로고침"
+        title="주변 추천 새로고침"
         @click="emit('refresh')"
       >
         <svg :class="{ spinning: isLoadingRecommendations }" viewBox="0 0 24 24">
@@ -255,7 +385,28 @@ defineExpose({ renderMap })
       </button>
     </div>
 
-    <article v-if="selectedHeritage" class="heritage-preview" aria-live="polite">
+    <!-- 클러스터/마커 클릭 팝업 -->
+    <article v-if="clusterPopup" class="cluster-popup" role="dialog" aria-label="문화재 목록">
+      <header>
+        <span>문화재 {{ clusterPopup.length }}곳</span>
+        <button type="button" aria-label="닫기" @click="clusterPopup = null">✕</button>
+      </header>
+      <ul>
+        <li v-for="h in clusterPopup" :key="h.heritageId">
+          <img v-if="h.thumbnailUrl" :src="h.thumbnailUrl" :alt="h.name" />
+          <span v-else class="popup-thumb-placeholder" aria-hidden="true">🏛</span>
+          <strong>{{ h.name }}</strong>
+          <RouterLink :to="`/heritage/${h.heritageId}`">보기</RouterLink>
+        </li>
+      </ul>
+    </article>
+
+    <!-- 추천 선택 시 미리보기 -->
+    <article
+      v-else-if="selectedHeritage"
+      class="heritage-preview"
+      aria-live="polite"
+    >
       <img
         v-if="selectedHeritage.thumbnailUrl"
         :src="selectedHeritage.thumbnailUrl"
@@ -263,7 +414,7 @@ defineExpose({ renderMap })
       />
       <div v-else class="preview-placeholder" aria-hidden="true">🏛</div>
       <div class="preview-content">
-        <span>NEARBY HERITAGE · {{ formatDistance(selectedHeritage.distanceM) }}</span>
+        <span>추천 유적지 · {{ formatDistance(selectedHeritage.distanceM) }}</span>
         <strong>{{ selectedHeritage.name }}</strong>
         <div class="preview-links">
           <RouterLink :to="`/heritage/${selectedHeritage.heritageId}`">상세 보기</RouterLink>
@@ -368,6 +519,99 @@ defineExpose({ renderMap })
   animation: spin 0.8s linear infinite;
 }
 
+/* 클러스터 팝업 */
+.cluster-popup {
+  position: absolute;
+  z-index: 500;
+  right: 14px;
+  bottom: 16px;
+  left: 14px;
+  max-height: 230px;
+  padding: 12px 14px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 10px 28px rgba(18, 39, 68, 0.22);
+  backdrop-filter: blur(12px);
+}
+.cluster-popup header {
+  flex: 0 0 auto;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cluster-popup header span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #17345c;
+  letter-spacing: 0.04em;
+}
+.cluster-popup header button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #6f7a87;
+  font-size: 12px;
+}
+.cluster-popup ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cluster-popup li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cluster-popup li img,
+.popup-thumb-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  flex: 0 0 44px;
+  object-fit: cover;
+}
+.popup-thumb-placeholder {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #eee2ca, #d9cab0);
+  font-size: 18px;
+}
+.cluster-popup li strong {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cluster-popup li a {
+  flex: 0 0 auto;
+  min-width: 40px;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid #cbd3df;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #34465f;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* 추천 선택 미리보기 */
 .heritage-preview {
   position: absolute;
   z-index: 500;
@@ -441,6 +685,7 @@ defineExpose({ renderMap })
   font-size: 10px;
   font-weight: 700;
 }
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -493,6 +738,49 @@ defineExpose({ renderMap })
     0 0 0 2px #2877c7,
     0 3px 10px rgba(0, 0, 0, 0.25);
 }
+:global(.rec-map-marker) {
+  position: relative;
+  padding: 5px 9px;
+  border: 2px solid #c46c18;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  color: #7a3e00;
+  background: #fff8ee;
+  box-shadow: 0 3px 10px rgba(196, 108, 24, 0.35);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+:global(.rec-map-marker::after) {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-top: 7px solid #c46c18;
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
+  transform: translateX(-50%);
+  content: '';
+}
+:global(.rec-map-marker span) {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-serif);
+}
+:global(.rec-map-marker[data-selected='true']) {
+  border-color: #8b4500;
+  color: #fff;
+  background: #c46c18;
+  box-shadow: 0 4px 14px rgba(196, 108, 24, 0.55);
+  transform: scale(1.08);
+  z-index: 5;
+}
+:global(.rec-map-marker[data-selected='true']::after) {
+  border-top-color: #8b4500;
+}
+
 :global(.heritage-map-marker span) {
   width: 32px;
   height: 32px;
@@ -508,22 +796,6 @@ defineExpose({ renderMap })
   font-weight: 700;
 }
 :global(.heritage-map-marker span::first-letter) {
-  transform: rotate(45deg);
-}
-:global(.recommended-map-marker span) {
-  width: 34px;
-  height: 34px;
-  border: 3px solid white;
-  border-radius: 50% 50% 50% 4px;
-  display: grid;
-  place-items: center;
-  transform: rotate(-45deg);
-  color: white;
-  background: #d97706;
-  box-shadow: 0 4px 12px rgba(69, 34, 0, 0.35);
-  font-size: 10px;
-}
-:global(.recommended-map-marker span::first-letter) {
   transform: rotate(45deg);
 }
 </style>

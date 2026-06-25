@@ -1,5 +1,5 @@
 import apiClient from './apiClient'
-import type { ApiResponse, HeritageDetailResponse, HeritageCategoryStats, ExplainResponse } from '@/types/api'
+import type { ApiResponse, HeritageDetailResponse, HeritageCategoryStats, ExplainResponse, HeritageMapItem } from '@/types/api'
 
 export const heritageApi = {
   getCategoryStats() {
@@ -24,6 +24,14 @@ export const heritageApi = {
     const params = topic ? { visitLogId, topic } : { visitLogId }
     return apiClient
       .get<ApiResponse<ExplainResponse>>(`/api/heritage/${heritageId}/explain/deeper`, { params })
+      .then((r) => r.data.data)
+  },
+
+  getMapHeritages(swLat: number, swLng: number, neLat: number, neLng: number) {
+    return apiClient
+      .get<ApiResponse<HeritageMapItem[]>>('/api/heritage/map', {
+        params: { swLat, swLng, neLat, neLng },
+      })
       .then((r) => r.data.data)
   },
 }
