@@ -14,6 +14,7 @@ const journeyStore = useJourneyStore()
 type ExplainTopic = 'STORY' | 'PERSON' | 'ARCHITECTURE' | 'CONTEXT' | 'MODERN'
 
 const selectedTopic = ref<ExplainTopic>('STORY')
+const visibleDeepTopic = ref<ExplainTopic | null>(null)
 const deepExplanation = ref('')
 const isLoadingDeep = ref(false)
 const isLoadingArchived = ref(false)
@@ -32,7 +33,7 @@ const topics: { value: ExplainTopic; icon: string; label: string; description: s
   { value: 'MODERN', icon: '◈', label: '현대적 영향', description: '오늘날에 남긴 의미' },
 ]
 const selectedTopicLabel = computed(
-  () => topics.find((topic) => topic.value === selectedTopic.value)?.label ?? '',
+  () => topics.find((topic) => topic.value === visibleDeepTopic.value)?.label ?? '',
 )
 
 onMounted(loadArchivedExplanation)
@@ -73,6 +74,8 @@ async function requestDeepExplanation() {
   if (!result.value?.visitLogId || isLoadingDeep.value) return
   isLoadingDeep.value = true
   errorMessage.value = ''
+  deepExplanation.value = ''
+  visibleDeepTopic.value = null
   try {
     const response = await heritageApi.explainDeeper(
       result.value.heritageId,
@@ -80,11 +83,18 @@ async function requestDeepExplanation() {
       selectedTopic.value,
     )
     deepExplanation.value = response.explanation
+    visibleDeepTopic.value = selectedTopic.value
   } catch {
     errorMessage.value = '심화 해설을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
   } finally {
     isLoadingDeep.value = false
   }
+}
+
+function selectTopic(topic: ExplainTopic) {
+  selectedTopic.value = topic
+  deepExplanation.value = ''
+  visibleDeepTopic.value = null
 }
 
 function returnToTrip() {
@@ -135,7 +145,7 @@ function returnToTrip() {
             :key="topic.value"
             type="button"
             :class="{ selected: selectedTopic === topic.value }"
-            @click="selectedTopic = topic.value"
+            @click="selectTopic(topic.value)"
           >
             <span>{{ topic.icon }}</span>
             <strong>{{ topic.label }}</strong>
