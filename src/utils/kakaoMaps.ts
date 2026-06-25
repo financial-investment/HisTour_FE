@@ -75,7 +75,10 @@ export interface KakaoMapsApi {
   LatLng: new (lat: number, lng: number) => KakaoLatLng
   LatLngBounds: new () => KakaoLatLngBounds
   Map: new (container: HTMLElement, options: KakaoMapOptions) => KakaoMap
-  CustomOverlay: new (options: KakaoCustomOverlayOptions) => { setMap(map: KakaoMap | null): void }
+  CustomOverlay: new (options: KakaoCustomOverlayOptions) => {
+    setMap(map: KakaoMap | null): void
+    setPosition(position: KakaoLatLng): void
+  }
   Polyline: new (options: KakaoPolylineOptions) => { setMap(map: KakaoMap | null): void }
   Marker: new (options: KakaoMarkerOptions) => KakaoMarker
   MarkerClusterer: new (options: KakaoMarkerClustererOptions) => KakaoMarkerClusterer

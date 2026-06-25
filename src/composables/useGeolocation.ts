@@ -21,3 +21,15 @@ export function getCurrentCoordinates(): Promise<Coordinates> {
     )
   })
 }
+
+export function watchCoordinates(onUpdate: (coords: Coordinates) => void): () => void {
+  if (!navigator.geolocation) return () => {}
+
+  const watchId = navigator.geolocation.watchPosition(
+    ({ coords }) => onUpdate({ lat: coords.latitude, lng: coords.longitude, isFallback: false }),
+    () => onUpdate({ ...SEOUL_FALLBACK, isFallback: true }),
+    { enableHighAccuracy: true, timeout: 10_000, maximumAge: 5_000 },
+  )
+
+  return () => navigator.geolocation.clearWatch(watchId)
+}

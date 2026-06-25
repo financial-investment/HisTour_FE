@@ -35,9 +35,12 @@ let map: KakaoMap | null = null
 let kakaoMaps: KakaoMapsApi | null = null
 let mapObjects: Array<{ setMap(map: KakaoMap | null): void }> = []
 let currentMarkerElement: HTMLElement | null = null
+let currentOverlay: { setMap(map: KakaoMap | null): void; setPosition(pos: KakaoLatLng): void } | null = null
 let clusterer: KakaoMarkerClusterer | null = null
 let idleDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const markerDataMap = new Map<KakaoMarker, HeritageMapItem>()
+let recommendationOverlays: Array<{ setMap(map: KakaoMap | null): void }> = []
+const recMarkerEls = new Map<number, HTMLElement>()
 
 const MIN_ROUTE_CURVE_OFFSET = 0.00035
 const ROUTE_CURVE_STEPS = 18
@@ -184,7 +187,7 @@ async function renderMap() {
     currentMarkerElement.style.setProperty('--device-heading', `${heading.value ?? 0}deg`)
     currentMarkerElement.classList.toggle('has-heading', heading.value !== null)
     currentMarkerElement.innerHTML = '<i aria-hidden="true"></i><span></span>'
-    const currentOverlay = new kakaoMaps.CustomOverlay({
+    currentOverlay = new kakaoMaps.CustomOverlay({
       position: center,
       content: currentMarkerElement,
       xAnchor: 0.5,
@@ -257,6 +260,7 @@ async function renderMap() {
 
     kakaoMaps.event.addListener(map, 'idle', onMapIdle)
     fetchViewportHeritages()
+    renderRecommendationMarkers()
   } catch {
     map = null
     mapErrorMessage.value = import.meta.env.VITE_KAKAO_MAP_APP_KEY
@@ -264,6 +268,49 @@ async function renderMap() {
       : '카카오 지도 JavaScript 키 설정이 필요해요.'
   }
 }
+
+function renderRecommendationMarkers() {
+  if (!map || !kakaoMaps) return
+  recommendationOverlays.forEach((o) => o.setMap(null))
+  recommendationOverlays = []
+  recMarkerEls.clear()
+
+  props.recommendations.forEach((heritage) => {
+    const el = document.createElement('div')
+    el.className = 'rec-map-marker'
+    el.title = heritage.name
+    el.dataset.selected = String(props.selectedHeritage?.heritageId === heritage.heritageId)
+    el.innerHTML = `<span>${heritage.name.length > 6 ? heritage.name.slice(0, 6) + '…' : heritage.name}</span>`
+    el.addEventListener('click', () => {
+      emit('update:selectedHeritage', heritage)
+      clusterPopup.value = null
+    })
+    recMarkerEls.set(heritage.heritageId, el)
+
+    const overlay = new kakaoMaps!.CustomOverlay({
+      position: new kakaoMaps!.LatLng(heritage.lat, heritage.lng),
+      content: el,
+      xAnchor: 0.5,
+      yAnchor: 1.3,
+      zIndex: 4,
+    })
+    overlay.setMap(map)
+    recommendationOverlays.push(overlay)
+  })
+}
+
+watch(() => props.coordinates, (coords) => {
+  if (!coords || !kakaoMaps || !currentOverlay) return
+  const pos = new kakaoMaps.LatLng(coords.lat, coords.lng)
+  currentOverlay.setPosition(pos)
+})
+
+watch(() => props.recommendations, renderRecommendationMarkers, { deep: false })
+watch(() => props.selectedHeritage, (heritage) => {
+  recMarkerEls.forEach((el, id) => {
+    el.dataset.selected = String(heritage?.heritageId === id)
+  })
+})
 
 watch(heading, (value) => {
   currentMarkerElement?.classList.toggle('has-heading', value !== null)
@@ -276,6 +323,9 @@ onBeforeUnmount(() => {
   clusterer?.clear()
   clusterer = null
   markerDataMap.clear()
+  recommendationOverlays.forEach((o) => o.setMap(null))
+  recommendationOverlays = []
+  recMarkerEls.clear()
   mapObjects.forEach((object) => object.setMap(null))
   mapObjects = []
   currentMarkerElement = null
@@ -687,6 +737,49 @@ defineExpose({ renderMap, panTo })
     0 0 0 2px #2877c7,
     0 3px 10px rgba(0, 0, 0, 0.25);
 }
+:global(.rec-map-marker) {
+  position: relative;
+  padding: 5px 9px;
+  border: 2px solid #c46c18;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  color: #7a3e00;
+  background: #fff8ee;
+  box-shadow: 0 3px 10px rgba(196, 108, 24, 0.35);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+:global(.rec-map-marker::after) {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-top: 7px solid #c46c18;
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
+  transform: translateX(-50%);
+  content: '';
+}
+:global(.rec-map-marker span) {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-serif);
+}
+:global(.rec-map-marker[data-selected='true']) {
+  border-color: #8b4500;
+  color: #fff;
+  background: #c46c18;
+  box-shadow: 0 4px 14px rgba(196, 108, 24, 0.55);
+  transform: scale(1.08);
+  z-index: 5;
+}
+:global(.rec-map-marker[data-selected='true']::after) {
+  border-top-color: #8b4500;
+}
+
 :global(.heritage-map-marker span) {
   width: 32px;
   height: 32px;
