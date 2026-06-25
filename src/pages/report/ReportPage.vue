@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
+import ImageCarousel, { type CarouselItem } from '@/components/common/ImageCarousel.vue'
 import { reportApi } from '@/api/reportApi'
 import { quizApi } from '@/api/quizApi'
 import { tripApi } from '@/api/tripApi'
@@ -41,6 +42,18 @@ const validCourseHeritages = computed(() =>
     .filter((heritage) => Number.isFinite(heritage.lat) && Number.isFinite(heritage.lng))
     .sort((a, b) => a.order - b.order),
 )
+const validVisitedLogs = computed(() =>
+  [...visitLogs.value]
+    .filter((log) => Number.isFinite(log.lat) && Number.isFinite(log.lng))
+    .sort((a, b) => new Date(a.visitedAt).getTime() - new Date(b.visitedAt).getTime()),
+)
+
+const activeMapTab = ref<'visited' | 'course'>('visited')
+const isMapEmpty = computed(() =>
+  activeMapTab.value === 'visited'
+    ? !validVisitedLogs.value.length
+    : !validCourseHeritages.value.length,
+)
 const summaryParagraphs = computed(() => {
   const summary = report.value?.summary?.trim()
   if (!summary && visitedHeritages.value.length) {
@@ -74,7 +87,7 @@ const quizResultMessage = computed(() => {
 
 let courseMap: KakaoMap | null = null
 let kakaoMaps: KakaoMapsApi | null = null
-let courseMapObjects: Array<{ setMap(map: KakaoMap | null): void }> = []
+let mapObjects: Array<{ setMap(map: KakaoMap | null): void }> = []
 
 onMounted(loadReport)
 
@@ -103,47 +116,113 @@ async function loadReport() {
   }
 }
 
-function getVisitedLabel(index: number) {
-  return `방문 ${String(index + 1).padStart(2, '0')}`
-}
-
 function getCourseNumber(index: number) {
   return String(index + 1).padStart(2, '0')
-}
-
-function getFallbackInitial(name: string) {
-  return name.trim().slice(0, 1) || 'H'
 }
 
 function openHeritage(heritage: VisitedHeritage | CourseHeritage) {
   router.push(`/heritage/${heritage.heritageId}`)
 }
 
-function openVisitedHeritage(heritage: VisitedHeritage) {
-  const visitLog = visitLogByHeritageId.value.get(heritage.heritageId)
-  if (!visitLog?.explanation) {
-    openHeritage(heritage)
+const visitedCarouselItems = computed<CarouselItem[]>(() =>
+  visitedHeritages.value.map((heritage, index) => {
+    const visitLog = visitLogByHeritageId.value.get(heritage.heritageId)
+    const params = visitLog?.explanation
+      ? new URLSearchParams({
+          tripId: String(visitLog.tripId),
+          visitLogId: String(visitLog.id),
+          returnTo: `/report/${visitLog.tripId}`,
+        }).toString()
+      : null
+    return {
+      url: heritage.thumbnailUrl ?? '/icon.png',
+      label: `방문 ${String(index + 1).padStart(2, '0')} · ${heritage.name}`,
+      linkTo: params
+        ? `/heritage/${heritage.heritageId}?${params}`
+        : `/heritage/${heritage.heritageId}`,
+    }
+  }),
+)
+
+function clearMap() {
+  mapObjects.forEach((object) => object.setMap(null))
+  mapObjects = []
+  courseMap = null
+}
+
+function getCenter(points: { lat: number; lng: number }[]) {
+  const total = points.reduce((acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }), { lat: 0, lng: 0 })
+  return { lat: total.lat / points.length, lng: total.lng / points.length }
+}
+
+async function renderVisitedMap() {
+  if (!courseMapElement.value) return
+  clearMap()
+  courseMapErrorMessage.value = ''
+
+  if (!validVisitedLogs.value.length) {
+    courseMapElement.value.replaceChildren()
     return
   }
 
-  const params = new URLSearchParams({
-    tripId: String(visitLog.tripId),
-    visitLogId: String(visitLog.id),
-    returnTo: `/report/${visitLog.tripId}`,
-  })
-  router.push(`/heritage/${heritage.heritageId}?${params.toString()}`)
-}
+  try {
+    kakaoMaps = await loadKakaoMaps()
+    courseMapElement.value.replaceChildren()
 
-function clearCourseMap() {
-  courseMapObjects.forEach((object) => object.setMap(null))
-  courseMapObjects = []
-  courseMap = null
+    const center = getCenter(validVisitedLogs.value)
+    courseMap = new kakaoMaps.Map(courseMapElement.value, {
+      center: new kakaoMaps.LatLng(center.lat, center.lng),
+      level: 6,
+    })
+
+    const bounds = new kakaoMaps.LatLngBounds()
+    const path = validVisitedLogs.value.map((log, index) => {
+      const position = new kakaoMaps!.LatLng(log.lat, log.lng)
+      bounds.extend(position)
+
+      const marker = document.createElement('button')
+      marker.type = 'button'
+      marker.className = 'report-visited-marker'
+      marker.title = log.heritageName
+      marker.setAttribute('aria-label', `${index + 1}번째 방문, ${log.heritageName}`)
+      marker.innerHTML = `<span>${index + 1}</span>`
+      marker.addEventListener('click', () => router.push(`/heritage/${log.heritageId}`))
+
+      const overlay = new kakaoMaps!.CustomOverlay({
+        position,
+        content: marker,
+        xAnchor: 0.5,
+        yAnchor: 1.1,
+        zIndex: 3,
+      })
+      overlay.setMap(courseMap)
+      mapObjects.push(overlay)
+
+      return position
+    })
+
+    if (path.length > 1) {
+      const shadow = new kakaoMaps.Polyline({ path, strokeColor: '#ffffff', strokeWeight: 8, strokeOpacity: 0.9, strokeStyle: 'solid' })
+      shadow.setMap(courseMap)
+      mapObjects.push(shadow)
+
+      const line = new kakaoMaps.Polyline({ path, strokeColor: '#1a2b48', strokeWeight: 4, strokeOpacity: 0.85, strokeStyle: 'solid' })
+      line.setMap(courseMap)
+      mapObjects.push(line)
+    }
+
+    courseMap.relayout()
+    courseMap.setBounds(bounds)
+  } catch {
+    courseMapErrorMessage.value = import.meta.env.VITE_KAKAO_MAP_APP_KEY
+      ? '카카오 지도를 불러오지 못했어요. 허용 도메인 설정을 확인해 주세요.'
+      : '카카오 지도 JavaScript 키 설정이 필요해요.'
+  }
 }
 
 async function renderCourseMap() {
   if (!courseMapElement.value) return
-
-  clearCourseMap()
+  clearMap()
   courseMapErrorMessage.value = ''
 
   if (!validCourseHeritages.value.length) {
@@ -155,7 +234,7 @@ async function renderCourseMap() {
     kakaoMaps = await loadKakaoMaps()
     courseMapElement.value.replaceChildren()
 
-    const center = getCourseCenter(validCourseHeritages.value)
+    const center = getCenter(validCourseHeritages.value)
     courseMap = new kakaoMaps.Map(courseMapElement.value, {
       center: new kakaoMaps.LatLng(center.lat, center.lng),
       level: 6,
@@ -182,31 +261,19 @@ async function renderCourseMap() {
         zIndex: 3,
       })
       overlay.setMap(courseMap)
-      courseMapObjects.push(overlay)
+      mapObjects.push(overlay)
 
       return position
     })
 
     if (path.length > 1) {
-      const routeShadow = new kakaoMaps.Polyline({
-        path,
-        strokeColor: '#ffffff',
-        strokeWeight: 8,
-        strokeOpacity: 0.92,
-        strokeStyle: 'solid',
-      })
-      routeShadow.setMap(courseMap)
-      courseMapObjects.push(routeShadow)
+      const shadow = new kakaoMaps.Polyline({ path, strokeColor: '#ffffff', strokeWeight: 8, strokeOpacity: 0.92, strokeStyle: 'solid' })
+      shadow.setMap(courseMap)
+      mapObjects.push(shadow)
 
-      const route = new kakaoMaps.Polyline({
-        path,
-        strokeColor: '#d97706',
-        strokeWeight: 4,
-        strokeOpacity: 0.9,
-        strokeStyle: 'solid',
-      })
-      route.setMap(courseMap)
-      courseMapObjects.push(route)
+      const line = new kakaoMaps.Polyline({ path, strokeColor: '#d97706', strokeWeight: 4, strokeOpacity: 0.9, strokeStyle: 'solid' })
+      line.setMap(courseMap)
+      mapObjects.push(line)
     }
 
     courseMap.relayout()
@@ -218,19 +285,8 @@ async function renderCourseMap() {
   }
 }
 
-function getCourseCenter(heritages: CourseHeritage[]) {
-  const total = heritages.reduce(
-    (acc, heritage) => ({
-      lat: acc.lat + heritage.lat,
-      lng: acc.lng + heritage.lng,
-    }),
-    { lat: 0, lng: 0 },
-  )
-
-  return {
-    lat: total.lat / heritages.length,
-    lng: total.lng / heritages.length,
-  }
+function renderMap() {
+  nextTick(activeMapTab.value === 'visited' ? renderVisitedMap : renderCourseMap)
 }
 
 async function loadSubmittedQuizResult() {
@@ -256,12 +312,12 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
-watch(validCourseHeritages, () => {
-  nextTick(renderCourseMap)
-})
+watch(validVisitedLogs, () => { if (activeMapTab.value === 'visited') renderMap() })
+watch(validCourseHeritages, () => { if (activeMapTab.value === 'course') renderMap() })
+watch(activeMapTab, renderMap)
 
 onBeforeUnmount(() => {
-  clearCourseMap()
+  clearMap()
 })
 </script>
 
@@ -269,7 +325,7 @@ onBeforeUnmount(() => {
   <main class="report-page">
     <header class="report-topbar">
       <div class="brand-lockup">
-        <span class="brand-avatar">H</span>
+        <img src="/icon.png" alt="HisTour" class="brand-avatar" />
         <strong>HisTour</strong>
       </div>
       <button type="button" aria-label="뒤로 가기" @click="router.back()">‹</button>
@@ -323,23 +379,12 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div v-if="visitedHeritages.length" class="record-scroll">
-          <button
-            v-for="(heritage, index) in visitedHeritages"
-            :key="heritage.heritageId"
-            class="record-card"
-            type="button"
-            @click="openVisitedHeritage(heritage)"
-          >
-            <div class="record-image">
-              <img v-if="heritage.thumbnailUrl" :src="normalizeAssetUrl(heritage.thumbnailUrl)" :alt="heritage.name" />
-              <span v-else>{{ getFallbackInitial(heritage.name) }}</span>
-              <small>{{ getVisitedLabel(index) }}</small>
-            </div>
-            <span>방문 기록</span>
-            <strong>{{ heritage.name }}</strong>
-          </button>
-        </div>
+        <ImageCarousel
+          v-if="visitedHeritages.length"
+          :items="visitedCarouselItems"
+          :height="240"
+          :show-controls="true"
+        />
 
         <div v-else class="empty-panel">
           <strong>방문 기록이 비어 있어요</strong>
@@ -348,22 +393,53 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="course-section">
-        <div class="course-map" :class="{ 'is-empty': !validCourseHeritages.length }">
-          <div ref="courseMapElement" class="course-map-canvas" aria-label="추천 코스 지도"></div>
+        <div class="map-tabs">
+          <button
+            type="button"
+            :class="{ active: activeMapTab === 'visited' }"
+            @click="activeMapTab = 'visited'"
+          >
+            방문 경로
+          </button>
+          <button
+            type="button"
+            :class="{ active: activeMapTab === 'course' }"
+            @click="activeMapTab = 'course'"
+          >
+            추천 코스
+          </button>
+        </div>
+
+        <div class="course-map" :class="{ 'is-empty': isMapEmpty }">
+          <div ref="courseMapElement" class="course-map-canvas" :aria-label="activeMapTab === 'visited' ? '방문 경로 지도' : '추천 코스 지도'"></div>
           <div v-if="courseMapErrorMessage" class="course-map-error" role="alert">
             <strong>지도를 표시할 수 없어요</strong>
             <span>{{ courseMapErrorMessage }}</span>
           </div>
-          <div v-else-if="!validCourseHeritages.length" class="course-map-empty">
-            <strong>추천 코스 좌표가 없어요</strong>
-            <span>코스가 준비되면 지도에 순서대로 표시됩니다.</span>
+          <div v-else-if="isMapEmpty" class="course-map-empty">
+            <strong>{{ activeMapTab === 'visited' ? '방문 기록이 없어요' : '추천 코스 좌표가 없어요' }}</strong>
+            <span>{{ activeMapTab === 'visited' ? '문화재를 방문하면 경로가 표시됩니다.' : '코스가 준비되면 지도에 순서대로 표시됩니다.' }}</span>
           </div>
         </div>
 
-        <div class="course-copy">
+        <div v-show="activeMapTab === 'visited'" class="course-copy">
+          <span>이번 여행</span>
+          <h2>방문한 유적지 경로</h2>
+          <ol v-if="validVisitedLogs.length">
+            <li v-for="(log, index) in validVisitedLogs" :key="log.id">
+              <b>{{ getCourseNumber(index) }}</b>
+              <button type="button" @click="router.push(`/heritage/${log.heritageId}`)">
+                <strong>{{ log.heritageName }}</strong>
+                <small>{{ new Date(log.visitedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) }} 방문</small>
+              </button>
+            </li>
+          </ol>
+          <p v-else>방문 기록이 없습니다.</p>
+        </div>
+
+        <div v-show="activeMapTab === 'course'" class="course-copy">
           <span>다음 여행 추천</span>
           <h2>{{ courseTitle }}</h2>
-
           <ol v-if="courseHeritages.length">
             <li v-for="(heritage, index) in courseHeritages" :key="heritage.heritageId">
               <b>{{ getCourseNumber(index) }}</b>
@@ -373,7 +449,6 @@ onBeforeUnmount(() => {
               </button>
             </li>
           </ol>
-
           <p v-else>추천 코스가 아직 준비되지 않았습니다.</p>
         </div>
       </section>
@@ -410,18 +485,24 @@ onBeforeUnmount(() => {
 .report-topbar {
   position: fixed;
   top: 0;
-  left: 50%;
+  left: 0;
   z-index: 10;
   display: flex;
   width: 100%;
-  max-width: var(--mobile-max-width);
   height: 64px;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
   border-bottom: 1px solid #c5c6ce;
   background: #f8f9ff;
-  transform: translateX(-50%);
+}
+
+@media (min-width: 768px) {
+  .report-topbar {
+    left: 50%;
+    max-width: var(--mobile-max-width);
+    transform: translateX(-50%);
+  }
 }
 
 .brand-lockup {
@@ -431,16 +512,11 @@ onBeforeUnmount(() => {
 }
 
 .brand-avatar {
-  display: grid;
   width: 32px;
   height: 32px;
   border: 1px solid #c5c6ce;
   border-radius: 50%;
-  place-items: center;
-  color: #fff;
-  background: linear-gradient(135deg, #1a2b48, #d97706);
-  font-size: 12px;
-  font-weight: 800;
+  object-fit: cover;
 }
 
 .brand-lockup strong,
@@ -463,7 +539,6 @@ onBeforeUnmount(() => {
 }
 
 .message-panel,
-.record-card,
 .empty-panel,
 .course-section {
   border: 1px solid #c5c6ce;
@@ -637,85 +712,31 @@ onBeforeUnmount(() => {
   margin-bottom: 22px;
 }
 
-.record-scroll {
-  display: flex;
-  gap: 16px;
-  margin: 0 -16px;
-  overflow-x: auto;
-  padding: 0 16px 12px;
-  scrollbar-color: #c5c6ce transparent;
-  scrollbar-width: thin;
-  scroll-snap-type: x mandatory;
-}
-
-.record-scroll::-webkit-scrollbar {
-  height: 6px;
-}
-
-.record-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: #c5c6ce;
-}
-
-.record-card {
-  flex: 0 0 210px;
-  padding: 12px;
-  color: inherit;
-  text-align: left;
-  scroll-snap-align: start;
-}
-
-.record-image {
-  position: relative;
-  aspect-ratio: 4 / 3;
-  margin-bottom: 12px;
-  overflow: hidden;
-  background: #eef4ff;
-}
-
-.record-image img,
-.record-image > span {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.record-image > span {
-  display: grid;
-  place-items: center;
-  color: #8293b5;
-  font-size: 36px;
-  font-weight: 800;
-}
-
-.record-image small {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 4px 7px;
-  color: #fff;
-  background: rgba(3, 22, 50, 0.92);
-  font-size: 9px;
-  font-weight: 800;
-}
-
-.record-card > span {
-  color: #5c5f60;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.record-card strong {
-  display: block;
-  margin-top: 4px;
-  color: #031632;
-  font-size: 16px;
-}
 
 .empty-panel {
   padding: 18px;
+}
+
+.map-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid #c5c6ce;
+  background: #fff;
+}
+
+.map-tabs button {
+  padding: 14px 0;
+  color: #8b96a4;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: color 0.15s, border-bottom 0.15s;
+  border-bottom: 3px solid transparent;
+}
+
+.map-tabs button.active {
+  color: #031632;
+  border-bottom-color: #1a2b48;
 }
 
 .course-section {
@@ -821,6 +842,24 @@ onBeforeUnmount(() => {
   color: #5c5f60;
   font-size: 13px;
   line-height: 1.45;
+}
+
+:global(.report-visited-marker) {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  place-items: center;
+  color: #fff;
+  background: #1a2b48;
+  box-shadow: 0 4px 12px rgba(3, 22, 50, 0.35);
+  cursor: pointer;
+}
+
+:global(.report-visited-marker span) {
+  font-size: 12px;
+  font-weight: 900;
 }
 
 :global(.report-course-marker) {
