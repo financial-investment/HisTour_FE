@@ -26,52 +26,50 @@ function getDifficultyLabel(difficulty: string) {
 </script>
 
 <template>
-  <template>
-    <section class="question-panel">
-      <div class="question-meta">
-        <span>문제 {{ currentIndex + 1 }} / {{ totalCount }}</span>
-        <span>{{ getDifficultyLabel(question.difficulty) }}</span>
-      </div>
+  <section class="question-panel">
+    <div class="question-meta">
+      <span>문제 {{ currentIndex + 1 }} / {{ totalCount }}</span>
+      <span>{{ getDifficultyLabel(question.difficulty) }}</span>
+    </div>
 
-      <div class="heritage-context">
-        <span>문화유산</span>
-        <strong>{{ question.heritageName }}</strong>
-      </div>
+    <div class="heritage-context">
+      <span>문화유산</span>
+      <strong>{{ question.heritageName }}</strong>
+    </div>
 
-      <h1>{{ question.content }}</h1>
+    <h1>{{ question.content }}</h1>
 
-      <p v-if="question.source" class="source-note">출처: {{ question.source }}</p>
-    </section>
+    <p v-if="question.source" class="source-note">출처: {{ question.source }}</p>
+  </section>
 
-    <section class="choice-list">
-      <h2>답을 선택하세요</h2>
-      <button
-        v-for="choice in question.choices"
-        :key="choice.choiceId"
-        class="choice-button"
-        :class="{ selected: selectedChoiceId === choice.choiceId }"
-        type="button"
-        @click="emit('select', choice)"
-      >
-        <i></i>
-        <span>{{ choice.content }}</span>
-      </button>
-    </section>
+  <section class="choice-list">
+    <h2>답을 선택하세요</h2>
+    <button
+      v-for="choice in question.choices"
+      :key="choice.choiceId"
+      class="choice-button"
+      :class="{ selected: selectedChoiceId === choice.choiceId }"
+      type="button"
+      @click="emit('select', choice)"
+    >
+      <i></i>
+      <span>{{ choice.content }}</span>
+    </button>
+  </section>
 
-    <footer class="quiz-actions">
-      <button type="button" :disabled="currentIndex === 0" @click="emit('previous')">← Previous</button>
-      <button v-if="!isLastQuestion" class="primary" type="button" @click="emit('next')">Next</button>
-      <button
-        v-else
-        class="primary"
-        type="button"
-        :disabled="!hasAnsweredAll || isSubmitting"
-        @click="emit('submit')"
-      >
-        {{ isSubmitting ? 'Submitting' : `Submit (${answeredCount}/${totalCount})` }}
-      </button>
-    </footer>
-  </template>
+  <footer class="quiz-actions">
+    <button type="button" :disabled="currentIndex === 0" @click="emit('previous')">← Previous</button>
+    <button v-if="!isLastQuestion" class="primary" type="button" @click="emit('next')">Next</button>
+    <button
+      v-else
+      class="primary"
+      type="button"
+      :disabled="!hasAnsweredAll || isSubmitting"
+      @click="emit('submit')"
+    >
+      {{ isSubmitting ? 'Submitting' : `Submit (${answeredCount}/${totalCount})` }}
+    </button>
+  </footer>
 </template>
 
 <style scoped>

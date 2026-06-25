@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { quizApi, type QuizAnswerSubmitRequest } from '@/api/quizApi'
@@ -19,6 +19,8 @@ import QuizResult from './components/QuizResult.vue'
 
 const route = useRoute()
 
+const QUIZ_QUESTION_COUNT = 10
+
 const session = ref<QuizSessionResponse | null>(null)
 const result = ref<QuizResultResponse | null>(null)
 const selectedChoiceIds = ref<Record<number, number>>({})
@@ -37,8 +39,10 @@ const isQuizIndex = computed(() => tripId.value === null)
 const completedTrips = computed(() => trips.value.filter((t) => t.status === 'COMPLETED'))
 const questions = computed(() => session.value?.questions ?? [])
 const currentQuestion = computed(() => questions.value[currentIndex.value] ?? null)
-const totalCount = computed(() => session.value?.totalCount ?? questions.value.length)
-const answeredCount = computed(() => Object.keys(selectedChoiceIds.value).length)
+const totalCount = computed(() => questions.value.length)
+const answeredCount = computed(() => {
+  return questions.value.filter((question) => selectedChoiceIds.value[question.sessionId]).length
+})
 const hasAnsweredAll = computed(
   () => questions.value.length > 0 && questions.value.every((q) => selectedChoiceIds.value[q.sessionId]),
 )
@@ -47,13 +51,22 @@ const progressPercent = computed(() => {
   return Math.round(((currentIndex.value + 1) / totalCount.value) * 100)
 })
 
-onMounted(() => {
+watch(tripId, () => {
+  resetQuizState()
   if (tripId.value) {
     loadQuiz()
   } else {
     loadTrips()
   }
-})
+}, { immediate: true })
+
+function resetQuizState() {
+  session.value = null
+  result.value = null
+  selectedChoiceIds.value = {}
+  currentIndex.value = 0
+  errorMessage.value = ''
+}
 
 async function loadTrips() {
   try {
@@ -76,16 +89,17 @@ async function loadQuiz() {
   try {
     isLoading.value = true
     errorMessage.value = ''
+    let loadedSession: QuizSessionResponse
     try {
-      session.value = await quizApi.getSession(tripId.value)
+      loadedSession = await quizApi.getSession(tripId.value)
     } catch (error: unknown) {
       if (getResponseStatus(error) === 404) {
-        session.value = await quizApi.createSession(tripId.value)
+        loadedSession = await quizApi.createSession(tripId.value)
       } else {
         throw error
       }
     }
-    await restoreSubmittedResult()
+    session.value = pickQuizQuestions(loadedSession)
     currentIndex.value = 0
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '퀴즈를 준비하지 못했습니다.')
@@ -110,7 +124,7 @@ async function submitQuiz() {
   try {
     isSubmitting.value = true
     errorMessage.value = ''
-    result.value = await quizApi.submitResults(answers)
+    result.value = limitQuizResult(await quizApi.submitResults(answers))
     currentIndex.value = 0
     window.scrollTo({ top: 0, behavior: 'smooth' })
   } catch (error) {
@@ -120,20 +134,75 @@ async function submitQuiz() {
   }
 }
 
-async function restoreSubmittedResult() {
-  if (!tripId.value) return
-  let submitted: QuizResultResponse | null = null
-  try {
-    submitted = await quizApi.getResults(tripId.value)
-  } catch {
-    return
+function pickQuizQuestions(
+  quizSession: QuizSessionResponse,
+  preferredSessionIds?: number[],
+  preferredQuizIds?: number[],
+): QuizSessionResponse {
+  const preferredIdSet = new Set(preferredSessionIds?.slice(0, QUIZ_QUESTION_COUNT) ?? [])
+  const preferredQuizIdSet = new Set(preferredQuizIds?.slice(0, QUIZ_QUESTION_COUNT) ?? [])
+  const preferredQuestions = preferredIdSet.size
+    ? quizSession.questions.filter((question) => {
+        return preferredIdSet.has(question.sessionId) || preferredQuizIdSet.has(question.quizId)
+      })
+    : []
+  const selectedIdSet = new Set(preferredQuestions.map((question) => question.sessionId))
+  const remainingQuestions = quizSession.questions.filter((question) => !selectedIdSet.has(question.sessionId))
+  const questions = [
+    ...preferredQuestions,
+    ...getRandomQuestions(remainingQuestions).slice(0, QUIZ_QUESTION_COUNT - preferredQuestions.length),
+  ]
+
+  return {
+    ...quizSession,
+    totalCount: questions.length,
+    questions,
   }
-  if (!submitted) return
-  result.value = submitted
-  selectedChoiceIds.value = submitted.results.reduce<Record<number, number>>((acc, item) => {
-    acc[item.sessionId] = item.selectedChoiceId
-    return acc
-  }, {})
+}
+
+function getRandomQuestions(questions: QuizQuestionResponse[]) {
+  if (questions.length <= QUIZ_QUESTION_COUNT) return questions
+
+  const shuffled = [...questions]
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = getRandomIndex(index + 1)
+    const currentQuestion = shuffled[index]
+    const swapQuestion = shuffled[swapIndex]
+    if (!currentQuestion || !swapQuestion) continue
+    shuffled[index] = swapQuestion
+    shuffled[swapIndex] = currentQuestion
+  }
+  return shuffled.slice(0, QUIZ_QUESTION_COUNT)
+}
+
+function getRandomIndex(max: number) {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const randomValues = new Uint32Array(1)
+    crypto.getRandomValues(randomValues)
+    return (randomValues[0] ?? 0) % max
+  }
+  return Math.floor(Math.random() * max)
+}
+
+function limitQuizResult(quizResult: QuizResultResponse): QuizResultResponse {
+  const questionBySessionId = new Map(questions.value.map((question) => [question.sessionId, question]))
+  const questionByQuizId = new Map(questions.value.map((question) => [question.quizId, question]))
+  const results = quizResult.results
+    .map((item) => {
+      const question = questionBySessionId.get(item.sessionId) ?? questionByQuizId.get(item.quizId)
+      return question ? { ...item, sessionId: question.sessionId } : null
+    })
+    .filter((item): item is QuizResultResponse['results'][number] => Boolean(item))
+  const correctCount = results.filter((item) => item.correct).length
+  const totalCount = results.length
+
+  return {
+    ...quizResult,
+    totalCount,
+    correctCount,
+    accuracy: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0,
+    results,
+  }
 }
 
 </script>
