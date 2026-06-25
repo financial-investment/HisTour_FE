@@ -14,6 +14,7 @@
 | 상태 관리 | Pinia                    |
 | 라우터    | Vue Router               |
 | HTTP      | Axios                    |
+| 지도      | Kakao Maps SDK (MarkerClusterer 포함) |
 | 코드 품질 | ESLint, oxlint, Prettier |
 
 ---
@@ -24,7 +25,7 @@
 src/
 ├── api/
 │   ├── apiClient.ts          # Axios 인스턴스 + JWT 인터셉터 (401 → refresh → retry)
-│   ├── heritageApi.ts        # 문화재 상세 / 해설 / 심화 해설 / 카테고리 통계
+│   ├── heritageApi.ts        # 문화재 상세 / 해설 / 심화 해설 / 지도 시야 조회
 │   ├── tripApi.ts            # 여행 목록·생성·상세·완료·추천
 │   ├── quizApi.ts            # 퀴즈 세션 생성·조회·답안 제출
 │   └── reportApi.ts          # 여행 리포트 조회
@@ -41,7 +42,7 @@ src/
 │       └── AppLayout.vue         # BottomNav 포함 레이아웃 래퍼
 ├── composables/
 │   ├── useToast.ts           # 전역 토스트 상태
-│   ├── useGeolocation.ts     # 현재 위치 조회
+│   ├── useGeolocation.ts     # 현재 위치 일회성 조회(getCurrentCoordinates) + 실시간 트래킹(watchCoordinates)
 │   └── useDeviceHeading.ts   # 디바이스 방위각
 ├── pages/
 │   ├── auth/
@@ -57,7 +58,14 @@ src/
 │   │       ├── MainStartCard.vue       # 새 여행 시작 유도 카드
 │   │       └── MainGuideCard.vue       # 서비스 사용 가이드
 │   ├── trip/
-│   │   └── TripPage.vue          # 카카오맵 + 카메라 FAB
+│   │   ├── TripPage.vue              # 진행 중 여행 (실시간 GPS 트래킹)
+│   │   └── components/
+│   │       ├── TripMapSection.vue        # 카카오맵 + 뷰포트 문화재 클러스터 + 추천 마커
+│   │       ├── TripRecommendationSection.vue  # AI 추천 목록
+│   │       ├── TripVisitedSection.vue    # 방문 기록 목록
+│   │       ├── TripActiveHeader.vue      # 여행 헤더 + 완료 버튼
+│   │       ├── TripCreatePanel.vue       # 새 여행 생성 폼
+│   │       └── TripCompleteDialog.vue    # 여행 완료 확인 모달
 │   ├── heritage/
 │   │   ├── HeritageDetailPage.vue      # 문화재 상세 (풀스크린)
 │   │   ├── HeritageScanPage.vue        # 카메라 촬영
@@ -83,7 +91,7 @@ src/
 │   └── api.ts                # BE 응답 타입 전체 정의
 └── utils/
     ├── imageUtils.ts         # fileToBase64 (HEIC → JPEG 동적 변환)
-    └── kakaoMaps.ts          # 카카오맵 SDK 로더 (싱글턴)
+    └── kakaoMaps.ts          # 카카오맵 SDK 로더 (MarkerClusterer, CustomOverlay, setPosition 등)
 ```
 
 ---
@@ -108,6 +116,9 @@ npm install
 
 # 개발 서버 실행
 npm run dev
+
+# 외부 기기(폰)에서 접근 가능하게 실행
+npm run dev -- --host
 
 # 빌드
 npm run build
@@ -135,3 +146,11 @@ npm run format
 /quiz/:tripId                 → QuizPage (풀스크린)
 /report/:tripId               → ReportPage (풀스크린)
 ```
+
+---
+
+## 지도 주요 동작
+
+- **뷰포트 문화재**: 카카오맵 `idle` 이벤트(300ms 디바운스) → 현재 시야 bounding box로 `GET /api/heritage/map` 호출 → MarkerClusterer로 표시. 줌아웃 최대 레벨 8(시(市) 단위) 제한.
+- **추천 마커**: AI 추천 문화재는 주황 말풍선 마커로 별도 표시. 목록 클릭 시 해당 위치로 `panTo`.
+- **현재 위치**: `watchPosition` GPS 실시간 트래킹 → `CustomOverlay.setPosition()`으로 마커 이동. 방위각 센서 연동 시 방향 화살표 표시.

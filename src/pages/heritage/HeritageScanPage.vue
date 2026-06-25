@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { heritageApi } from '@/api/heritageApi'
 import { getCurrentCoordinates } from '@/composables/useGeolocation'
 import { useJourneyStore } from '@/stores/journeyStore'
-import { fileToBase64 } from '@/utils/imageUtils'
+import { extractGpsFromFile, fileToBase64 } from '@/utils/imageUtils'
 
 const route = useRoute()
 const router = useRouter()
@@ -77,7 +77,8 @@ async function analyze(file: File) {
   isProcessing.value = true
   errorMessage.value = ''
   try {
-    const [image, position] = await Promise.all([fileToBase64(file), getCurrentCoordinates()])
+    const [image, exifGps] = await Promise.all([fileToBase64(file), extractGpsFromFile(file)])
+    const position = exifGps ?? (await getCurrentCoordinates())
     const tripId = Number(route.params.tripId)
     const result = await heritageApi.explain({
       image,

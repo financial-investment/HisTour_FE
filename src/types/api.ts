@@ -67,6 +67,14 @@ export interface TripDetailResponse {
   visitLogs: VisitLogResponse[]
 }
 
+export interface HeritageMapItem {
+  heritageId: number
+  name: string
+  lat: number
+  lng: number
+  thumbnailUrl: string | null
+}
+
 export interface RecommendedHeritage {
   heritageId: number
   name: string

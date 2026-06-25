@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { heritageApi } from '@/api/heritageApi'
 import { tripApi } from '@/api/tripApi'
 import { useToast } from '@/composables/useToast'
-import { getCurrentCoordinates, type Coordinates } from '@/composables/useGeolocation'
+import { getCurrentCoordinates, watchCoordinates, type Coordinates } from '@/composables/useGeolocation'
 import type { RecommendedHeritage, TripDetailResponse, TripResponse } from '@/types/api'
 import TripActiveHeader from './components/TripActiveHeader.vue'
 import TripCompleteDialog from './components/TripCompleteDialog.vue'
@@ -24,6 +24,7 @@ const heritageLocations = ref<Record<number, { lat: number; lng: number }>>({})
 const mapSection = ref<InstanceType<typeof TripMapSection> | null>(null)
 const title = ref('')
 const tripDate = ref(new Date().toISOString().slice(0, 10))
+let stopLocationWatch: (() => void) | null = null
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isCompleting = ref(false)
@@ -95,7 +96,11 @@ async function loadTrips() {
 
   await renderTripMap()
   await loadRecommendations()
-  await renderTripMap()
+
+  stopLocationWatch?.()
+  stopLocationWatch = watchCoordinates((coords) => {
+    coordinates.value = coords
+  })
 }
 
 async function createTrip() {
@@ -112,6 +117,10 @@ async function createTrip() {
     coordinates.value = await getCurrentCoordinates()
     await loadRecommendations()
     await renderTripMap()
+    stopLocationWatch?.()
+    stopLocationWatch = watchCoordinates((coords) => {
+      coordinates.value = coords
+    })
   } catch {
     errorMessage.value = '여행을 시작하지 못했어요. 입력 내용을 확인해 주세요.'
   } finally {
@@ -134,13 +143,19 @@ async function loadRecommendations() {
       (heritage) => !visitedHeritageIds.has(heritage.heritageId),
     )
     selectedHeritage.value = recommendations.value[0] ?? null
-  } catch {
+  } catch (error) {
+    console.error('[TripPage] recommendNext 실패:', error)
     recommendations.value = []
     selectedHeritage.value = null
     errorMessage.value = '주변 문화유산을 불러오지 못했어요.'
   } finally {
     isLoadingRecommendations.value = false
   }
+}
+
+function handleRecommendationSelect(heritage: RecommendedHeritage) {
+  selectedHeritage.value = heritage
+  mapSection.value?.panTo(heritage.lat, heritage.lng)
 }
 
 async function refreshNearbyHeritages() {
@@ -175,6 +190,7 @@ async function completeTrip() {
   }
 }
 
+onBeforeUnmount(() => stopLocationWatch?.())
 onMounted(loadTrips)
 </script>
 
@@ -215,7 +231,7 @@ onMounted(loadTrips)
       :recommendations="recommendations"
       :selected-heritage="selectedHeritage"
       :is-loading="isLoadingRecommendations"
-      @select="selectedHeritage = $event"
+      @select="handleRecommendationSelect"
     />
 
     <TripVisitedSection :logs="visitedLogs" :error-message="errorMessage" />
