@@ -133,17 +133,22 @@ html {
 }
 
 body {
-  max-width: var(--mobile-max-width);
-  margin: 0 auto;
   min-height: 100vh;
   background-color: var(--color-bg);
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.4);
   color: var(--color-on-bg);
   font-family: var(--font-sans);
   font-size: var(--text-body-md);
   line-height: var(--lh-body-md);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (min-width: 768px) {
+  body {
+    max-width: var(--mobile-max-width);
+    margin: 0 auto;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.4);
+  }
 }
 
 #app {

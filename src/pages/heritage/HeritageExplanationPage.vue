@@ -5,12 +5,14 @@ import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import { heritageApi } from '@/api/heritageApi'
 import { tripApi } from '@/api/tripApi'
 import { useJourneyStore } from '@/stores/journeyStore'
+import { useToast } from '@/composables/useToast'
 import { normalizeAssetUrl } from '@/utils/assetUrl'
 import type { ExplainResponse } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 const journeyStore = useJourneyStore()
+const toast = useToast()
 type ExplainTopic = 'STORY' | 'PERSON' | 'ARCHITECTURE' | 'CONTEXT' | 'MODERN'
 
 const selectedTopic = ref<ExplainTopic>('STORY')
@@ -73,7 +75,6 @@ async function loadArchivedExplanation() {
 async function requestDeepExplanation() {
   if (!result.value?.visitLogId || isLoadingDeep.value) return
   isLoadingDeep.value = true
-  errorMessage.value = ''
   deepExplanation.value = ''
   visibleDeepTopic.value = null
   try {
@@ -85,7 +86,7 @@ async function requestDeepExplanation() {
     deepExplanation.value = response.explanation
     visibleDeepTopic.value = selectedTopic.value
   } catch {
-    errorMessage.value = '심화 해설을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+    toast.error('심화 해설을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')
   } finally {
     isLoadingDeep.value = false
   }
@@ -156,7 +157,6 @@ function returnToTrip() {
           {{ isLoadingDeep ? '이야기를 찾는 중...' : '선택한 심화 해설 보기' }}
         </button>
         <p v-if="!result.visitLogId" class="hint">여행 중 스캔한 문화재만 심화 해설을 볼 수 있어요.</p>
-        <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
       </section>
 
       <article v-if="deepExplanation" class="deep-result">

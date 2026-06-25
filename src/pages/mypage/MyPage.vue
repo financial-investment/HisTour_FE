@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { tripApi } from '@/api/tripApi'
 import { heritageApi } from '@/api/heritageApi'
+import { useToast } from '@/composables/useToast'
 import type { TripResponse, VisitLogResponse, HeritageCategoryStats } from '@/types/api'
 import MyProfileHeader from './components/MyProfileHeader.vue'
 import MyPeriodChart from './components/MyPeriodChart.vue'
@@ -26,6 +27,7 @@ const PERIOD_NAMES: Record<string, string> = {
 
 const router = useRouter()
 const userStore = useUserStore()
+const toast = useToast()
 
 const trips = ref<TripResponse[]>([])
 const isLoading = ref(false)
@@ -150,7 +152,7 @@ onMounted(async () => {
     loadTripDetails()
     loadCategoryTotals()
   } catch {
-    // 조용히 실패
+    toast.error('여행 기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')
   } finally {
     isLoading.value = false
   }
