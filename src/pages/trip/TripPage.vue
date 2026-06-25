@@ -95,7 +95,6 @@ async function loadTrips() {
 
   await renderTripMap()
   await loadRecommendations()
-  await renderTripMap()
 }
 
 async function createTrip() {
@@ -141,6 +140,11 @@ async function loadRecommendations() {
   } finally {
     isLoadingRecommendations.value = false
   }
+}
+
+function handleRecommendationSelect(heritage: RecommendedHeritage) {
+  selectedHeritage.value = heritage
+  mapSection.value?.panTo(heritage.lat, heritage.lng)
 }
 
 async function refreshNearbyHeritages() {
@@ -215,7 +219,7 @@ onMounted(loadTrips)
       :recommendations="recommendations"
       :selected-heritage="selectedHeritage"
       :is-loading="isLoadingRecommendations"
-      @select="selectedHeritage = $event"
+      @select="handleRecommendationSelect"
     />
 
     <TripVisitedSection :logs="visitedLogs" :error-message="errorMessage" />
