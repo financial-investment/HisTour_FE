@@ -399,6 +399,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .report-page {
+  width: min(100%, var(--mobile-max-width));
+  margin: 0 auto;
   min-height: 100dvh;
   padding: 80px 16px 110px;
   color: #121c28;
