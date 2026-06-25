@@ -3,7 +3,6 @@ defineProps<{
   title: string
   tripDate: string
   isSubmitting: boolean
-  errorMessage: string
 }>()
 
 const emit = defineEmits<{
@@ -66,7 +65,6 @@ const emit = defineEmits<{
           </p>
         </aside>
 
-        <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
         <button class="primary-button" type="submit" :disabled="isSubmitting">
           <span aria-hidden="true">▶</span>{{ isSubmitting ? '여행 준비 중...' : 'Start Trip' }}
         </button>
@@ -241,11 +239,5 @@ label > span {
   color: #a3a8af;
   font-size: 8px;
   letter-spacing: 0.08em;
-}
-.error-message {
-  margin-top: 14px;
-  color: #ba1a1a;
-  font-size: 12px;
-  text-align: center;
 }
 </style>

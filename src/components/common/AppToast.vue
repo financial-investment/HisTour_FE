@@ -20,15 +20,22 @@ const { toasts } = useToast()
 .toast-container {
   position: fixed;
   top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(var(--mobile-max-width) - 32px);
-  max-width: calc(100vw - 32px);
+  left: 16px;
+  right: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 10000;
   pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .toast-container {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: calc(var(--mobile-max-width) - 32px);
+  }
 }
 
 .toast {

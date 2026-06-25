@@ -101,16 +101,22 @@ function isActive(path: string) {
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
   width: 100%;
-  max-width: var(--mobile-max-width);
   height: 60px;
   background: var(--color-surface-lowest);
   border-top: 1px solid var(--color-outline-variant);
   display: flex;
   align-items: center;
   z-index: 100;
+}
+
+@media (min-width: 768px) {
+  .bottom-nav {
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: var(--mobile-max-width);
+  }
 }
 
 .nav-item {

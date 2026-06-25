@@ -712,11 +712,17 @@ function getResponseStatus(error: unknown) {
   display: grid;
   grid-template-columns: 0.9fr 1.2fr;
   gap: 16px;
-  width: min(100%, var(--mobile-max-width));
-  margin: 0 auto;
+  width: 100%;
   padding: 16px;
   border-top: 1px solid #d9dee8;
   background: #ffffff;
+}
+
+@media (min-width: 768px) {
+  .quiz-actions {
+    width: min(100%, var(--mobile-max-width));
+    margin: 0 auto;
+  }
 }
 
 .quiz-actions button {
