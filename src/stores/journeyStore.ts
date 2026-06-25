@@ -14,6 +14,9 @@ export const useJourneyStore = defineStore('journey', () => {
   }
 
   function clear() {
+    if (previewUrl.value?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl.value)
+    }
     explanation.value = null
     previewUrl.value = null
     tripId.value = null
