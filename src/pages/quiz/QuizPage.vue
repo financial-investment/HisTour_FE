@@ -13,8 +13,6 @@ import type {
   TripResponse,
 } from '@/types/api'
 
-type TripLike = TripResponse & { tripId?: number }
-
 const route = useRoute()
 const router = useRouter()
 
@@ -25,7 +23,7 @@ const currentIndex = ref(0)
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
-const trips = ref<TripLike[]>([])
+const trips = ref<TripResponse[]>([])
 const openResultId = ref<number | null>(null)
 
 const tripId = computed(() => {
@@ -74,7 +72,7 @@ async function loadTrips() {
   try {
     isLoading.value = true
     errorMessage.value = ''
-    trips.value = (await tripApi.list()) as TripLike[]
+    trips.value = await tripApi.list()
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '여행 목록을 불러오지 못했습니다.')
   } finally {
@@ -168,11 +166,11 @@ async function restoreSubmittedResult() {
   openResultId.value = submittedResult.results[0]?.sessionId ?? null
 }
 
-function getTripId(trip: TripLike) {
-  return trip.tripId ?? null
+function getTripId(trip: TripResponse) {
+  return trip.tripId
 }
 
-function formatTripTitle(trip: TripLike) {
+function formatTripTitle(trip: TripResponse) {
   return trip.title || `${formatDate(trip.tripDate || trip.createdAt)} 여행`
 }
 

@@ -51,6 +51,7 @@ export interface VisitLogResponse {
   tripId: number
   heritageId: number
   heritageName: string
+  heritageThumbnailUrl: string | null
   photoUrl: string | null
   lat: number
   lng: number

@@ -24,6 +24,6 @@ export default defineConfig({
       },
     },
 
-    allowedHosts: ['nontalkatively-inexplicable-pasty.ngrok-free.dev'],
+    allowedHosts: true,
   },
 })

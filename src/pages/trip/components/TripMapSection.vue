@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useDeviceHeading } from '@/composables/useDeviceHeading'
 import type { Coordinates } from '@/composables/useGeolocation'
 import type { HeritageMapItem, RecommendedHeritage, VisitLogResponse } from '@/types/api'
@@ -51,11 +51,11 @@ function formatDistance(distanceM: number) {
   return `${(distanceM / 1000).toFixed(1)}km`
 }
 
-function getSortedVisitLogs() {
-  return [...props.visitedLogs].sort(
+const sortedVisitLogs = computed(() =>
+  [...props.visitedLogs].sort(
     (a, b) => new Date(a.visitedAt).getTime() - new Date(b.visitedAt).getTime(),
-  )
-}
+  ),
+)
 
 function getCurvedRoutePath(points: Array<{ lat: number; lng: number }>) {
   if (points.length < 2 || !kakaoMaps) return []
@@ -198,8 +198,8 @@ async function renderMap() {
     currentOverlay.setMap(map)
     mapObjects.push(currentOverlay)
 
-    const sortedVisitLogs = getSortedVisitLogs()
-    const routePoints = sortedVisitLogs.map((log, index) => {
+    const sortedLogs = sortedVisitLogs.value
+    const routePoints = sortedLogs.map((log, index) => {
       const position = new kakaoMaps!.LatLng(log.lat, log.lng)
       const marker = document.createElement('div')
       marker.className = 'heritage-map-marker'
@@ -218,7 +218,7 @@ async function renderMap() {
     })
 
     if (routePoints.length > 1) {
-      const routePath = getCurvedRoutePath(sortedVisitLogs)
+      const routePath = getCurvedRoutePath(sortedLogs)
       if (routePath.length > 1) {
         const routeShadow = new kakaoMaps.Polyline({
           path: routePath,

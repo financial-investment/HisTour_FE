@@ -83,16 +83,9 @@ async function loadTripDetails() {
     trips.value.map(async (trip) => {
       try {
         const detail = await tripApi.getDetail(trip.tripId)
-        let thumb = detail.visitLogs.find((l) => l.photoUrl)?.photoUrl ?? null
-        let fallbackThumb: string | null = null
         const firstLog = detail.visitLogs[0]
-        if (firstLog) {
-          try {
-            const h = await heritageApi.getDetail(firstLog.heritageId)
-            fallbackThumb = h.thumbnailUrl ?? null
-            if (!thumb) thumb = fallbackThumb
-          } catch {}
-        }
+        const fallbackThumb = firstLog?.heritageThumbnailUrl ?? null
+        const thumb = detail.visitLogs.find((l) => l.photoUrl)?.photoUrl ?? fallbackThumb
         map[trip.tripId] = { thumb, fallbackThumb, logs: detail.visitLogs }
       } catch {
         map[trip.tripId] = { thumb: null, fallbackThumb: null, logs: [] }
