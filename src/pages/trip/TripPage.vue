@@ -30,7 +30,6 @@ const isSubmitting = ref(false)
 const isCompleting = ref(false)
 const isLoadingRecommendations = ref(false)
 const showCompleteDialog = ref(false)
-const errorMessage = ref('')
 
 const hasActiveTrip = computed(() => Boolean(activeTrip.value))
 const visitedLogs = computed(() => activeTrip.value?.visitLogs ?? [])
@@ -77,7 +76,6 @@ async function loadVisitedHeritageLocations() {
 
 async function loadTrips() {
   isLoading.value = true
-  errorMessage.value = ''
   try {
     trips.value = await tripApi.list()
     const current = trips.value.find((trip) => trip.status === 'IN_PROGRESS')
@@ -87,7 +85,7 @@ async function loadTrips() {
       coordinates.value = await getCurrentCoordinates()
     }
   } catch {
-    errorMessage.value = '여행 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+    toast.error('여행 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')
   } finally {
     isLoading.value = false
   }
@@ -106,7 +104,6 @@ async function loadTrips() {
 async function createTrip() {
   if (isSubmitting.value) return
   isSubmitting.value = true
-  errorMessage.value = ''
   try {
     const tripId = await tripApi.create({
       title: title.value.trim() || undefined,
@@ -121,8 +118,9 @@ async function createTrip() {
     stopLocationWatch = watchCoordinates((coords) => {
       coordinates.value = coords
     })
+    toast.success('여행이 시작됐어요!')
   } catch {
-    errorMessage.value = '여행을 시작하지 못했어요. 입력 내용을 확인해 주세요.'
+    toast.error('여행을 시작하지 못했어요. 입력 내용을 확인해 주세요.')
   } finally {
     isSubmitting.value = false
   }
@@ -143,11 +141,10 @@ async function loadRecommendations() {
       (heritage) => !visitedHeritageIds.has(heritage.heritageId),
     )
     selectedHeritage.value = recommendations.value[0] ?? null
-  } catch (error) {
-    console.error('[TripPage] recommendNext 실패:', error)
+  } catch {
     recommendations.value = []
     selectedHeritage.value = null
-    errorMessage.value = '주변 문화유산을 불러오지 못했어요.'
+    toast.error('주변 문화유산을 불러오지 못했어요.')
   } finally {
     isLoadingRecommendations.value = false
   }
@@ -160,7 +157,6 @@ function handleRecommendationSelect(heritage: RecommendedHeritage) {
 
 async function refreshNearbyHeritages() {
   if (isLoadingRecommendations.value) return
-  errorMessage.value = ''
   coordinates.value = await getCurrentCoordinates()
   await loadRecommendations()
   await renderTripMap()
@@ -177,14 +173,13 @@ function requestCompleteTrip() {
 async function completeTrip() {
   if (!activeTrip.value || isCompleting.value || !visitedLogs.value.length) return
   isCompleting.value = true
-  errorMessage.value = ''
   try {
     const tripId = activeTrip.value.tripId
     await tripApi.complete(tripId)
     showCompleteDialog.value = false
     await router.push(`/report/${tripId}`)
   } catch {
-    errorMessage.value = '여행을 완료하지 못했어요. 다시 시도해 주세요.'
+    toast.error('여행을 완료하지 못했어요. 다시 시도해 주세요.')
   } finally {
     isCompleting.value = false
   }
@@ -205,7 +200,6 @@ onMounted(loadTrips)
     v-model:title="title"
     v-model:trip-date="tripDate"
     :is-submitting="isSubmitting"
-    :error-message="errorMessage"
     @submit="createTrip"
   />
 
@@ -234,7 +228,7 @@ onMounted(loadTrips)
       @select="handleRecommendationSelect"
     />
 
-    <TripVisitedSection :logs="visitedLogs" :error-message="errorMessage" />
+    <TripVisitedSection :logs="visitedLogs" />
   </main>
 
   <Teleport to="body">

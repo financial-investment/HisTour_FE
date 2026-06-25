@@ -6,7 +6,6 @@ import { applyFallbackAsset, normalizeAssetUrl } from '@/utils/assetUrl'
 
 const props = defineProps<{
   logs: VisitLogResponse[]
-  errorMessage: string
 }>()
 
 const { loadThumbnails, getThumbnail } = useHeritageThumbnails()
@@ -56,7 +55,6 @@ function formatTime(value: string) {
       <span>⌖</span>
       <p>아직 기록된 문화재가 없어요.<br />스캔 버튼으로 첫 장소를 남겨보세요.</p>
     </div>
-    <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
   </section>
 </template>
 
@@ -147,10 +145,4 @@ function formatTime(value: string) {
   font-size: 25px;
 }
 
-.error-message {
-  margin-top: 14px;
-  color: #ba1a1a;
-  font-size: 12px;
-  text-align: center;
-}
 </style>
