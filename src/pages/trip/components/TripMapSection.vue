@@ -7,6 +7,7 @@ import { heritageApi } from '@/api/heritageApi'
 import {
   loadKakaoMaps,
   type KakaoCluster,
+  type KakaoLatLng,
   type KakaoMap,
   type KakaoMarker,
   type KakaoMarkerClusterer,

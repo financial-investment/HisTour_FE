@@ -117,6 +117,10 @@ async function createTrip() {
     coordinates.value = await getCurrentCoordinates()
     await loadRecommendations()
     await renderTripMap()
+    stopLocationWatch?.()
+    stopLocationWatch = watchCoordinates((coords) => {
+      coordinates.value = coords
+    })
   } catch {
     errorMessage.value = '여행을 시작하지 못했어요. 입력 내용을 확인해 주세요.'
   } finally {
