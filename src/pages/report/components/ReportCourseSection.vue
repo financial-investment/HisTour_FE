@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { loadKakaoMaps, type KakaoMap, type KakaoMapsApi } from '@/utils/kakaoMaps'
 import type { CourseHeritage, VisitLogResponse } from '@/types/api'
@@ -184,6 +184,7 @@ watch(validVisitedLogs, () => { if (activeMapTab.value === 'visited') renderMap(
 watch(validCourseHeritages, () => { if (activeMapTab.value === 'course') renderMap() })
 watch(activeMapTab, renderMap)
 
+onMounted(renderMap)
 onBeforeUnmount(clearMap)
 </script>
 
